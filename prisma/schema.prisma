@@ -1,0 +1,539 @@
+generator client {
+    provider = "prisma-client"
+    output   = "../generated/prisma"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+// ENUMS
+enum FirmMemberRole {
+    ADMIN
+    LAWYER
+    ASSISTANT
+    INTERN
+}
+
+enum FirmMemberStatus {
+    ACTIVE
+    INACTIVE
+    PENDING
+}
+
+enum TemplateOrigin {
+    SYSTEM
+    FIRM_CUSTOM
+    FIRM_COPY
+}
+
+enum DocumentStatus {
+    DRAFT
+    COMPLETED
+    REVISION
+    ARCHIVED
+}
+
+enum SignatureType {
+    DRAW
+    TYPE
+    UPLOAD
+}
+
+enum SubscriptionStatus {
+    TRIAL
+    ACTIVE
+    CANCELLED
+    EXPIRED
+    PAST_DUE
+}
+
+enum BillingCycle {
+    MONTHLY
+    ANNUALLY
+}
+
+enum InvoiceStatus {
+    PENDING
+    PAID
+    FAILED
+    REFUNDED
+    VOIDED
+}
+
+enum PaymentMethodType {
+    CARD
+    BANK_TRANSFER
+    PSE
+}
+
+enum LogLevel {
+    DEBUG
+    INFO
+    WARN
+    ERROR
+    FATAL
+}
+
+enum LogContext {
+    AUTH
+    USER_MANAGEMENT
+    DOCUMENTS
+    TEMPLATES
+    FIRM
+    SUBSCRIPTIONS
+    SYSTEM
+    SECURITY
+}
+
+enum ActionType {
+    CREATE
+    READ
+    UPDATE
+    DELETE
+    LOGIN
+    LOGOUT
+    EXPORT
+    IMPORT
+    RESTORE
+}
+
+// USUARIO Y AUTENTICACION
+model User {
+    id            String    @id @default(uuid()) @map("UID_USER")
+    numId         Int       @unique @default(autoincrement()) @map("NUM_ID_USER")
+    firstName     String    @map("STR_FIRST_NAME_USER")
+    lastName      String    @map("STR_LAST_NAME_USER")
+    email         String    @unique @map("STR_EMAIL_USER")
+    phone         String?   @map("STR_PHONE_USER")
+    address       String?   @map("STR_ADDRESS_USER")
+    city          String?   @map("STR_CITY_USER")
+    country       String?   @default("Colombia") @map("STR_COUNTRY_USER")
+    birthDate     DateTime? @map("DTM_BIRTH_DATE_USER")
+    bio           String?   @map("STR_BIO_USER")
+    avatarUrl     String?   @map("STR_AVATAR_URL_USER")
+    cloudPublicId String?   @map("STR_CLOUD_PUBLIC_ID_USER")
+    lastLoginAt   DateTime? @map("DTM_LAST_LOGIN_AT_USER")
+    deletedAt     DateTime? @map("DTM_DELETED_AT_USER")
+    createdAt     DateTime  @default(now()) @map("DTM_CREATED_AT")
+    updatedAt     DateTime  @updatedAt @map("DTM_UPDATED_AT")
+
+    credentials       Credentials?
+    notificationPrefs NotificationPreferences?
+    securitySettings  SecuritySettings?
+    firmMemberships   FirmMember[]
+    documents         Document[]
+    digitalSignatures DigitalSignature[]
+    templateFavorites TemplateFavorite[]
+    documentFavorites DocumentFavorite[]
+    logs              Log[]
+
+    @@index([deletedAt])
+    @@map("USER")
+}
+
+model Credentials {
+    id               String    @id @default(uuid()) @map("UID_CREDENTIALS")
+    userId           String    @unique @map("UID_USER")
+    email            String    @unique @map("STR_EMAIL_CREDENTIALS")
+    password         String?   @map("STR_PASSWORD_CREDENTIALS")
+    googleId         String?   @unique @map("STR_GOOGLE_ID_CREDENTIALS")
+    microsoftId      String?   @unique @map("STR_MICROSOFT_ID_CREDENTIALS")
+    isEmailVerified  Boolean   @default(false) @map("BOOL_IS_EMAIL_VERIFIED_CREDENTIALS")
+    emailVerifyToken String?   @map("STR_EMAIL_VERIFY_TOKEN_CREDENTIALS")
+    resetToken       String?   @map("STR_RESET_TOKEN_CREDENTIALS")
+    resetTokenExpiry DateTime? @map("DTM_RESET_TOKEN_EXPIRY_CREDENTIALS")
+    createdAt        DateTime  @default(now()) @map("DTM_CREATED_AT")
+    updatedAt        DateTime  @updatedAt @map("DTM_UPDATED_AT")
+
+    user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+    refreshTokens RefreshToken[]
+
+    @@map("CREDENTIALS")
+}
+
+model RefreshToken {
+    id            String    @id @default(uuid()) @map("UID_REFRESH_TOKEN")
+    credentialsId String    @map("UID_CREDENTIALS")
+    tokenHash     String    @map("STR_TOKEN_HASH_REFRESH_TOKEN")
+    expiresAt     DateTime  @map("DTM_EXPIRES_AT_REFRESH_TOKEN")
+    revokedAt     DateTime? @map("DTM_REVOKED_AT_REFRESH_TOKEN")
+    userAgent     String?   @map("STR_USER_AGENT_REFRESH_TOKEN")
+    ipAddress     String?   @map("STR_IP_ADDRESS_REFRESH_TOKEN")
+    createdAt     DateTime  @default(now()) @map("DTM_CREATED_AT")
+
+    credentials Credentials @relation(fields: [credentialsId], references: [id], onDelete: Cascade)
+
+    @@index([credentialsId])
+    @@index([tokenHash])
+    @@map("REFRESH_TOKEN")
+}
+
+model NotificationPreferences {
+    id                   String   @id @default(uuid()) @map("UID_NOTIFICATION_PREFS")
+    userId               String   @unique @map("UID_USER")
+    emailNewDocument     Boolean  @default(true) @map("BOOL_EMAIL_NEW_DOCUMENT_NOTIF_PREFS")
+    emailDocumentShared  Boolean  @default(true) @map("BOOL_EMAIL_DOCUMENT_SHARED_NOTIF_PREFS")
+    emailTemplateUpdated Boolean  @default(true) @map("BOOL_EMAIL_TEMPLATE_UPDATED_NOTIF_PREFS")
+    emailTeamInvite      Boolean  @default(true) @map("BOOL_EMAIL_TEAM_INVITE_NOTIF_PREFS")
+    emailBilling         Boolean  @default(true) @map("BOOL_EMAIL_BILLING_NOTIF_PREFS")
+    emailLegalUpdates    Boolean  @default(false) @map("BOOL_EMAIL_LEGAL_UPDATES_NOTIF_PREFS")
+    inAppNewDocument     Boolean  @default(true) @map("BOOL_INAPP_NEW_DOCUMENT_NOTIF_PREFS")
+    inAppDocumentShared  Boolean  @default(true) @map("BOOL_INAPP_DOCUMENT_SHARED_NOTIF_PREFS")
+    inAppTeamActivity    Boolean  @default(true) @map("BOOL_INAPP_TEAM_ACTIVITY_NOTIF_PREFS")
+    inAppBilling         Boolean  @default(true) @map("BOOL_INAPP_BILLING_NOTIF_PREFS")
+    createdAt            DateTime @default(now()) @map("DTM_CREATED_AT")
+    updatedAt            DateTime @updatedAt @map("DTM_UPDATED_AT")
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("NOTIFICATION_PREFERENCES")
+}
+
+model SecuritySettings {
+    id                 String   @id @default(uuid()) @map("UID_SECURITY_SETTINGS")
+    userId             String   @unique @map("UID_USER")
+    twoFactorEnabled   Boolean  @default(false) @map("BOOL_TWO_FACTOR_ENABLED_SECURITY_SETTINGS")
+    twoFactorMethod    String   @default("email") @map("STR_TWO_FACTOR_METHOD_SECURITY_SETTINGS")
+    twoFactorSecret    String?  @map("STR_TWO_FACTOR_SECRET_SECURITY_SETTINGS")
+    sessionTimeoutMins Int      @default(480) @map("NUM_SESSION_TIMEOUT_MINS_SECURITY_SETTINGS")
+    loginNotifications Boolean  @default(true) @map("BOOL_LOGIN_NOTIFICATIONS_SECURITY_SETTINGS")
+    createdAt          DateTime @default(now()) @map("DTM_CREATED_AT")
+    updatedAt          DateTime @updatedAt @map("DTM_UPDATED_AT")
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("SECURITY_SETTINGS")
+}
+
+// FIRMA / DESPACHO
+model Firm {
+    id            String    @id @default(uuid()) @map("UID_FIRM")
+    numId         Int       @unique @default(autoincrement()) @map("NUM_ID_FIRM")
+    name          String    @map("STR_NAME_FIRM")
+    legalName     String?   @map("STR_LEGAL_NAME_FIRM")
+    nit           String?   @map("STR_NIT_FIRM")
+    address       String?   @map("STR_ADDRESS_FIRM")
+    city          String?   @map("STR_CITY_FIRM")
+    country       String?   @default("Colombia") @map("STR_COUNTRY_FIRM")
+    phone         String?   @map("STR_PHONE_FIRM")
+    email         String?   @map("STR_EMAIL_FIRM")
+    website       String?   @map("STR_WEBSITE_FIRM")
+    description   String?   @map("STR_DESCRIPTION_FIRM")
+    logoUrl       String?   @map("STR_LOGO_URL_FIRM")
+    cloudPublicId String?   @map("STR_CLOUD_PUBLIC_ID_FIRM")
+    createdBy     String    @map("UID_CREATED_BY_FIRM")
+    deletedAt     DateTime? @map("DTM_DELETED_AT_FIRM")
+    createdAt     DateTime  @default(now()) @map("DTM_CREATED_AT")
+    updatedAt     DateTime  @updatedAt @map("DTM_UPDATED_AT")
+
+    specialties    FirmSpecialty[]
+    members        FirmMember[]
+    documents      Document[]
+    templates      DocumentTemplate[]
+    legalBranches  LegalBranch[]
+    subscription   Subscription?
+    invoices       Invoice[]
+    paymentMethods PaymentMethod[]
+
+    @@index([deletedAt])
+    @@map("FIRM")
+}
+
+model FirmSpecialty {
+    id        String @id @default(uuid()) @map("UID_FIRM_SPECIALTY")
+    firmId    String @map("UID_FIRM")
+    specialty String @map("STR_SPECIALTY_FIRM_SPECIALTY")
+
+    firm Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+    @@map("FIRM_SPECIALTY")
+}
+
+model FirmMember {
+    id              String           @id @default(uuid()) @map("UID_FIRM_MEMBER")
+    firmId          String           @map("UID_FIRM")
+    userId          String?          @map("UID_USER")
+    role            FirmMemberRole   @default(ASSISTANT) @map("STR_ROLE_FIRM_MEMBER")
+    status          FirmMemberStatus @default(PENDING) @map("STR_STATUS_FIRM_MEMBER")
+    inviteEmail     String?          @map("STR_INVITE_EMAIL_FIRM_MEMBER")
+    inviteToken     String?          @map("STR_INVITE_TOKEN_FIRM_MEMBER")
+    inviteExpiresAt DateTime?        @map("DTM_INVITE_EXPIRES_AT_FIRM_MEMBER")
+    joinedAt        DateTime?        @map("DTM_JOINED_AT_FIRM_MEMBER")
+    lastActiveAt    DateTime?        @map("DTM_LAST_ACTIVE_AT_FIRM_MEMBER")
+    createdAt       DateTime         @default(now()) @map("DTM_CREATED_AT")
+    updatedAt       DateTime         @updatedAt @map("DTM_UPDATED_AT")
+
+    firm Firm  @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+    @@unique([firmId, userId])
+    @@index([firmId])
+    @@index([inviteToken])
+    @@map("FIRM_MEMBER")
+}
+
+// GENERADOR: RAMAS Y PLANTILLAS
+model LegalBranch {
+    id          String    @id @default(uuid()) @map("UID_LEGAL_BRANCH")
+    numId       Int       @default(autoincrement()) @map("NUM_ID_LEGAL_BRANCH")
+    name        String    @map("STR_NAME_LEGAL_BRANCH")
+    slug        String    @map("STR_SLUG_LEGAL_BRANCH")
+    description String?   @map("STR_DESCRIPTION_LEGAL_BRANCH")
+    icon        String?   @map("STR_ICON_LEGAL_BRANCH")
+    color       String?   @map("STR_COLOR_LEGAL_BRANCH")
+    isSystem    Boolean   @default(false) @map("BOOL_IS_SYSTEM_LEGAL_BRANCH")
+    firmId      String?   @map("UID_FIRM")
+    isActive    Boolean   @default(true) @map("BOOL_IS_ACTIVE_LEGAL_BRANCH")
+    sortOrder   Int       @default(0) @map("NUM_SORT_ORDER_LEGAL_BRANCH")
+    deletedAt   DateTime? @map("DTM_DELETED_AT_LEGAL_BRANCH")
+    createdAt   DateTime  @default(now()) @map("DTM_CREATED_AT")
+    updatedAt   DateTime  @updatedAt @map("DTM_UPDATED_AT")
+
+    firm      Firm?              @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    templates DocumentTemplate[]
+    documents Document[]
+
+    @@index([slug])
+    @@index([firmId])
+    @@index([isSystem])
+    @@index([deletedAt])
+    @@map("LEGAL_BRANCH")
+}
+
+model DocumentTemplate {
+    id                    String         @id @default(uuid()) @map("UID_DOCUMENT_TEMPLATE")
+    numId                 Int            @default(autoincrement()) @map("NUM_ID_DOCUMENT_TEMPLATE")
+    documentType          String         @map("STR_DOCUMENT_TYPE_TEMPLATE")
+    version               String         @default("1.0") @map("STR_VERSION_TEMPLATE")
+    title                 String         @map("STR_TITLE_TEMPLATE")
+    branchId              String         @map("UID_LEGAL_BRANCH")
+    subcategory           String?        @map("STR_SUBCATEGORY_TEMPLATE")
+    applicableRegulations Json           @default("[]") @map("JSON_APPLICABLE_REGULATIONS_TEMPLATE")
+    requiresRegistration  Boolean        @default(false) @map("BOOL_REQUIRES_REGISTRATION_TEMPLATE")
+    legalValidity         Boolean        @default(true) @map("BOOL_LEGAL_VALIDITY_TEMPLATE")
+    variableFields        Json           @default("{}") @map("JSON_VARIABLE_FIELDS_TEMPLATE")
+    textTemplate          String?        @map("STR_TEXT_TEMPLATE")
+    origin                TemplateOrigin @default(SYSTEM) @map("STR_ORIGIN_TEMPLATE")
+    parentTemplateId      String?        @map("UID_PARENT_TEMPLATE")
+    firmId                String?        @map("UID_FIRM")
+    createdBy             String?        @map("UID_CREATED_BY_TEMPLATE")
+    isActive              Boolean        @default(true) @map("BOOL_IS_ACTIVE_TEMPLATE")
+    deletedAt             DateTime?      @map("DTM_DELETED_AT_TEMPLATE")
+    createdAt             DateTime       @default(now()) @map("DTM_CREATED_AT")
+    updatedAt             DateTime       @updatedAt @map("DTM_UPDATED_AT")
+
+    branch         LegalBranch        @relation(fields: [branchId], references: [id])
+    firm           Firm?              @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    parentTemplate DocumentTemplate?  @relation("TemplateCopies", fields: [parentTemplateId], references: [id])
+    copies         DocumentTemplate[] @relation("TemplateCopies")
+    documents      Document[]
+    favorites      TemplateFavorite[]
+
+    @@index([branchId])
+    @@index([firmId])
+    @@index([documentType])
+    @@index([origin])
+    @@index([deletedAt])
+    @@map("DOCUMENT_TEMPLATE")
+}
+
+model TemplateFavorite {
+    id         String   @id @default(uuid()) @map("UID_TEMPLATE_FAVORITE")
+    templateId String   @map("UID_DOCUMENT_TEMPLATE")
+    userId     String   @map("UID_USER")
+    createdAt  DateTime @default(now()) @map("DTM_CREATED_AT")
+
+    template DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+    user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([templateId, userId])
+    @@map("TEMPLATE_FAVORITE")
+}
+
+// DOCUMENTOS
+model Document {
+    id               String         @id @default(uuid()) @map("UID_DOCUMENT")
+    numId            Int            @unique @default(autoincrement()) @map("NUM_ID_DOCUMENT")
+    title            String         @map("STR_TITLE_DOCUMENT")
+    templateId       String?        @map("UID_DOCUMENT_TEMPLATE")
+    documentType     String         @map("STR_DOCUMENT_TYPE_DOCUMENT")
+    branchId         String?        @map("UID_LEGAL_BRANCH")
+    formData         Json           @default("{}") @map("JSON_FORM_DATA_DOCUMENT")
+    content          String?        @map("STR_CONTENT_DOCUMENT")
+    hasCustomContent Boolean        @default(false) @map("BOOL_HAS_CUSTOM_CONTENT_DOCUMENT")
+    status           DocumentStatus @default(DRAFT) @map("STR_STATUS_DOCUMENT")
+    firmId           String         @map("UID_FIRM")
+    createdBy        String         @map("UID_CREATED_BY_DOCUMENT")
+    deletedAt        DateTime?      @map("DTM_DELETED_AT_DOCUMENT")
+    trashExpiresAt   DateTime?      @map("DTM_TRASH_EXPIRES_AT_DOCUMENT")
+    createdAt        DateTime       @default(now()) @map("DTM_CREATED_AT")
+    updatedAt        DateTime       @updatedAt @map("DTM_UPDATED_AT")
+
+    template  DocumentTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
+    branch    LegalBranch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+    firm      Firm               @relation(fields: [firmId], references: [id])
+    author    User               @relation(fields: [createdBy], references: [id])
+    favorites DocumentFavorite[]
+
+    @@index([firmId])
+    @@index([status])
+    @@index([deletedAt])
+    @@index([createdBy])
+    @@index([branchId])
+    @@map("DOCUMENT")
+}
+
+model DocumentFavorite {
+    id         String   @id @default(uuid()) @map("UID_DOCUMENT_FAVORITE")
+    documentId String   @map("UID_DOCUMENT")
+    userId     String   @map("UID_USER")
+    createdAt  DateTime @default(now()) @map("DTM_CREATED_AT")
+
+    document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+    user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([documentId, userId])
+    @@map("DOCUMENT_FAVORITE")
+}
+
+// FIRMAS DIGITALES
+model DigitalSignature {
+    id            String        @id @default(uuid()) @map("UID_DIGITAL_SIGNATURE")
+    userId        String        @map("UID_USER")
+    name          String        @map("STR_NAME_SIGNATURE")
+    type          SignatureType @map("STR_TYPE_SIGNATURE")
+    content       String        @map("STR_CONTENT_SIGNATURE")
+    font          String?       @map("STR_FONT_SIGNATURE")
+    cloudPublicId String?       @map("STR_CLOUD_PUBLIC_ID_SIGNATURE")
+    isDefault     Boolean       @default(false) @map("BOOL_IS_DEFAULT_SIGNATURE")
+    deletedAt     DateTime?     @map("DTM_DELETED_AT_SIGNATURE")
+    createdAt     DateTime      @default(now()) @map("DTM_CREATED_AT")
+    updatedAt     DateTime      @updatedAt @map("DTM_UPDATED_AT")
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([deletedAt])
+    @@map("DIGITAL_SIGNATURE")
+}
+
+// SUSCRIPCION Y FACTURACION
+model SubscriptionPlan {
+    id            String   @id @default(uuid()) @map("UID_SUBSCRIPTION_PLAN")
+    name          String   @unique @map("STR_NAME_PLAN")
+    displayName   String   @map("STR_DISPLAY_NAME_PLAN")
+    description   String?  @map("STR_DESCRIPTION_PLAN")
+    priceMonthly  Decimal? @map("NUM_PRICE_MONTHLY_PLAN")
+    priceAnnually Decimal? @map("NUM_PRICE_ANNUALLY_PLAN")
+    maxDocuments  Int?     @map("NUM_MAX_DOCUMENTS_PLAN")
+    maxUsers      Int?     @map("NUM_MAX_USERS_PLAN")
+    maxTemplates  Int?     @map("NUM_MAX_TEMPLATES_PLAN")
+    features      Json     @default("[]") @map("JSON_FEATURES_PLAN")
+    isActive      Boolean  @default(true) @map("BOOL_IS_ACTIVE_PLAN")
+    sortOrder     Int      @default(0) @map("NUM_SORT_ORDER_PLAN")
+    createdAt     DateTime @default(now()) @map("DTM_CREATED_AT")
+    updatedAt     DateTime @updatedAt @map("DTM_UPDATED_AT")
+
+    subscriptions Subscription[]
+
+    @@map("SUBSCRIPTION_PLAN")
+}
+
+model Subscription {
+    id           String             @id @default(uuid()) @map("UID_SUBSCRIPTION")
+    firmId       String             @unique @map("UID_FIRM")
+    planId       String             @map("UID_SUBSCRIPTION_PLAN")
+    status       SubscriptionStatus @default(TRIAL) @map("STR_STATUS_SUBSCRIPTION")
+    billingCycle BillingCycle       @default(MONTHLY) @map("STR_BILLING_CYCLE_SUBSCRIPTION")
+    startDate    DateTime           @map("DTM_START_DATE_SUBSCRIPTION")
+    endDate      DateTime?          @map("DTM_END_DATE_SUBSCRIPTION")
+    trialEndsAt  DateTime?          @map("DTM_TRIAL_ENDS_AT_SUBSCRIPTION")
+    cancelledAt  DateTime?          @map("DTM_CANCELLED_AT_SUBSCRIPTION")
+    createdAt    DateTime           @default(now()) @map("DTM_CREATED_AT")
+    updatedAt    DateTime           @updatedAt @map("DTM_UPDATED_AT")
+
+    firm     Firm             @relation(fields: [firmId], references: [id])
+    plan     SubscriptionPlan @relation(fields: [planId], references: [id])
+    invoices Invoice[]
+
+    @@map("SUBSCRIPTION")
+}
+
+model Invoice {
+    id                 String        @id @default(uuid()) @map("UID_INVOICE")
+    numId              Int           @unique @default(autoincrement()) @map("NUM_ID_INVOICE")
+    firmId             String        @map("UID_FIRM")
+    subscriptionId     String?       @map("UID_SUBSCRIPTION")
+    invoiceNumber      String        @unique @map("STR_INVOICE_NUMBER")
+    amount             Decimal       @map("NUM_AMOUNT_INVOICE")
+    currency           String        @default("COP") @map("STR_CURRENCY_INVOICE")
+    status             InvoiceStatus @default(PENDING) @map("STR_STATUS_INVOICE")
+    billingPeriodStart DateTime?     @map("DTM_BILLING_PERIOD_START_INVOICE")
+    billingPeriodEnd   DateTime?     @map("DTM_BILLING_PERIOD_END_INVOICE")
+    dueDate            DateTime?     @map("DTM_DUE_DATE_INVOICE")
+    paidAt             DateTime?     @map("DTM_PAID_AT_INVOICE")
+    pdfUrl             String?       @map("STR_PDF_URL_INVOICE")
+    externalId         String?       @map("STR_EXTERNAL_ID_INVOICE")
+    createdAt          DateTime      @default(now()) @map("DTM_CREATED_AT")
+    updatedAt          DateTime      @updatedAt @map("DTM_UPDATED_AT")
+
+    firm         Firm          @relation(fields: [firmId], references: [id])
+    subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+
+    @@index([firmId])
+    @@map("INVOICE")
+}
+
+model PaymentMethod {
+    id          String            @id @default(uuid()) @map("UID_PAYMENT_METHOD")
+    firmId      String            @map("UID_FIRM")
+    type        PaymentMethodType @map("STR_TYPE_PAYMENT_METHOD")
+    lastFour    String?           @map("STR_LAST_FOUR_PAYMENT_METHOD")
+    brand       String?           @map("STR_BRAND_PAYMENT_METHOD")
+    holderName  String?           @map("STR_HOLDER_NAME_PAYMENT_METHOD")
+    expiryMonth Int?              @map("NUM_EXPIRY_MONTH_PAYMENT_METHOD")
+    expiryYear  Int?              @map("NUM_EXPIRY_YEAR_PAYMENT_METHOD")
+    isDefault   Boolean           @default(false) @map("BOOL_IS_DEFAULT_PAYMENT_METHOD")
+    externalId  String?           @map("STR_EXTERNAL_ID_PAYMENT_METHOD")
+    createdAt   DateTime          @default(now()) @map("DTM_CREATED_AT")
+    updatedAt   DateTime          @updatedAt @map("DTM_UPDATED_AT")
+
+    firm Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+    @@index([firmId])
+    @@map("PAYMENT_METHOD")
+}
+
+// AUDITORIA
+model Log {
+    id             String     @id @default(uuid()) @map("UID_LOG")
+    numId          Int        @default(autoincrement()) @map("NUM_ID_LOG")
+    userId         String?    @map("UID_USER")
+    level          LogLevel   @default(INFO) @map("STR_LEVEL_LOG")
+    context        LogContext @default(SYSTEM) @map("STR_CONTEXT_LOG")
+    action         ActionType @default(READ) @map("STR_ACTION_LOG")
+    message        String     @default("") @map("STR_MESSAGE_LOG")
+    description    String?    @map("STR_DESCRIPTION_LOG")
+    method         String?    @map("STR_HTTP_METHOD_LOG")
+    url            String?    @map("STR_URL_LOG")
+    statusCode     Int?       @map("NUM_STATUS_CODE_LOG")
+    responseTimeMs Int?       @map("NUM_RESPONSE_TIME_MS_LOG")
+    ipAddress      String?    @map("STR_IP_ADDRESS_LOG")
+    userAgent      String?    @map("STR_USER_AGENT_LOG")
+    requestId      String?    @map("STR_REQUEST_ID_LOG")
+    sessionId      String?    @map("STR_SESSION_ID_LOG")
+    additionalData Json?      @map("JSON_ADDITIONAL_DATA_LOG")
+    timestamp      DateTime   @default(now()) @map("DTM_TIMESTAMP_LOG")
+    createdAt      DateTime   @default(now()) @map("DTM_CREATED_AT")
+    updatedAt      DateTime   @updatedAt @map("DTM_UPDATED_AT")
+
+    user User? @relation(fields: [userId], references: [id])
+
+    @@index([timestamp])
+    @@index([level])
+    @@index([context])
+    @@index([userId])
+    @@index([userId, timestamp])
+    @@map("LOG")
+}
