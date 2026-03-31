@@ -14,6 +14,7 @@ export class DocumentEntity implements Document
     status: DocumentStatus;
     firmId: string;
     createdBy: string;
+    processId: string | null;
     deletedAt: Date | null;
     trashExpiresAt: Date | null;
     createdAt: Date;

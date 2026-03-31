@@ -1,4 +1,4 @@
-import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post} from '@nestjs/common';
+import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query} from '@nestjs/common';
 import {ApiHeader, ApiOperation, ApiTags} from '@nestjs/swagger';
 import {BranchService} from './branch.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
@@ -8,6 +8,7 @@ import {LoggedUser} from '../../interfaces/LoggedUser';
 import {FirmMemberRole} from '../../../generated/prisma/client';
 import {CreateBranchDto} from './dto/create-branch.dto';
 import {UpdateBranchDto} from './dto/update-branch.dto';
+import {BranchFiltersDto} from './dto/branch-filters.dto';
 
 @ApiTags('Branch')
 @ApiHeader({name: 'X-Firm-Id', required: false, description: 'ID de la firma activa (selector de workspace)'})
@@ -18,9 +19,9 @@ export class BranchController
 
     @Get()
     @ApiOperation({summary: 'Listar ramas jurídicas del sistema y del despacho'})
-    async findAll(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined)
+    async findAll(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Query() filters: BranchFiltersDto = {})
     {
-        return this.branchService.findAll(user.userId, firmId);
+        return this.branchService.findAll(user.userId, firmId, filters);
     }
 
     @Post()

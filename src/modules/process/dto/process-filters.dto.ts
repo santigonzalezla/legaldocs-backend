@@ -1,19 +1,19 @@
 import {ApiProperty} from '@nestjs/swagger';
 import {Transform, Type} from 'class-transformer';
 import {IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min} from 'class-validator';
-import {DocumentStatus} from '../../../../generated/prisma/client';
+import {ProcessStatus} from '../../../../generated/prisma/client';
 
-export class DocumentFiltersDto
+export class ProcessFiltersDto
 {
-    @IsEnum(DocumentStatus)
+    @IsEnum(ProcessStatus)
     @IsOptional()
-    @ApiProperty({description: 'Filtrar por estado del documento', required: false, enum: DocumentStatus})
-    status?: DocumentStatus;
+    @ApiProperty({description: 'Filtrar por estado del proceso', required: false, enum: ProcessStatus})
+    status?: ProcessStatus;
 
-    @IsString()
+    @IsUUID()
     @IsOptional()
-    @ApiProperty({description: 'Buscar por título del documento', required: false})
-    search?: string;
+    @ApiProperty({description: 'Filtrar por cliente', required: false})
+    clientId?: string;
 
     @IsUUID()
     @IsOptional()
@@ -22,20 +22,19 @@ export class DocumentFiltersDto
 
     @IsUUID()
     @IsOptional()
-    @ApiProperty({description: 'Filtrar por proceso legal asociado', required: false})
-    processId?: string;
+    @ApiProperty({description: 'Filtrar por miembro asignado', required: false})
+    assignedTo?: string;
+
+    @IsString()
+    @IsOptional()
+    @ApiProperty({description: 'Buscar por título o radicado', required: false})
+    search?: string;
 
     @Transform(({value}) => value === 'true')
     @IsBoolean()
     @IsOptional()
-    @ApiProperty({description: 'Mostrar documentos en la papelera', required: false})
+    @ApiProperty({description: 'Mostrar procesos eliminados', required: false})
     inTrash?: boolean;
-
-    @Transform(({value}) => value === 'true')
-    @IsBoolean()
-    @IsOptional()
-    @ApiProperty({description: 'Filtrar solo documentos marcados como favoritos', required: false})
-    isFavorite?: boolean;
 
     @IsInt()
     @Min(1)

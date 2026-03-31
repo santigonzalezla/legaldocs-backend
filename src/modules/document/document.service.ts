@@ -35,7 +35,7 @@ export class DocumentService
         }
     }
 
-    async findAll(userId: string, firmId: string | undefined, filters: DocumentFiltersDto): Promise<{data: (DocumentEntity & {isFavorite: boolean})[]; total: number; page: number; limit: number}>
+    async findAll(userId: string, firmId: string | undefined, filters: DocumentFiltersDto): Promise<{data: (DocumentEntity & {isFavorite: boolean; branchSlug: string | null})[]; total: number; page: number; limit: number}>
     {
         try
         {
@@ -50,13 +50,14 @@ export class DocumentService
                 ...(filters.status   && {status:   filters.status}),
                 ...(filters.branchId && {branchId: filters.branchId}),
                 ...(filters.search   && {title: {contains: filters.search, mode: 'insensitive' as const}}),
+                ...(filters.processId  && {processId: filters.processId}),
                 ...(filters.isFavorite && {favorites: {some: {userId}}}),
             };
 
             const [raw, total] = await this.prisma.$transaction([
                 this.prisma.document.findMany({
                     where,
-                    include: {favorites: {where: {userId}, select: {userId: true}}},
+                    include: {favorites: {where: {userId}, select: {userId: true}}, branch: {select: {slug: true}}},
                     orderBy: {createdAt: 'desc'},
                     skip,
                     take: limit,
@@ -64,9 +65,10 @@ export class DocumentService
                 this.prisma.document.count({where}),
             ]);
 
-            const data = raw.map(({favorites, ...doc}) => ({
+            const data = raw.map(({favorites, branch, ...doc}) => ({
                 ...doc,
                 isFavorite: favorites.length > 0,
+                branchSlug: branch?.slug ?? null,
             }));
 
             return {data, total, page, limit};
@@ -78,11 +80,21 @@ export class DocumentService
         }
     }
 
-    async findOne(userId: string, firmId: string | undefined, id: string): Promise<DocumentEntity>
+    async findOne(userId: string, firmId: string | undefined, id: string): Promise<DocumentEntity & {branchSlug: string | null}>
     {
         try
         {
-            return this.findUserDocument(userId, firmId, id);
+            const firm = await this.firmService.getMyFirm(userId, firmId);
+
+            const document = await this.prisma.document.findFirst({
+                where:   {id, firmId: firm.id, deletedAt: null},
+                include: {branch: {select: {slug: true}}},
+            });
+
+            if (!document) throw new NotFoundException('Documento no encontrado');
+
+            const {branch, ...doc} = document;
+            return {...doc, branchSlug: branch?.slug ?? null};
         }
         catch (error)
         {

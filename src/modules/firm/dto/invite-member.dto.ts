@@ -1,9 +1,11 @@
 import {ApiProperty} from '@nestjs/swagger';
 import {IsEmail, IsEnum, IsNotEmpty} from 'class-validator';
+import {Transform} from 'class-transformer';
 import {FirmMemberRole} from '../../../../generated/prisma/client';
 
 export class InviteMemberDto
 {
+    @Transform(({value}) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     @IsEmail()
     @IsNotEmpty()
     @ApiProperty({

@@ -11,6 +11,7 @@ import {FirmEntity} from './entities/firm.entity';
 import {FirmMemberEntity} from './entities/firm-member.entity';
 import {FirmSpecialtyEntity} from './entities/firm-specialty.entity';
 import {Firm, FirmMemberRole, FirmMemberStatus} from '../../../generated/prisma/client';
+import {Prisma} from '../../../generated/prisma/client';
 
 @Injectable()
 export class FirmService
@@ -162,10 +163,10 @@ export class FirmService
             await this.assertCanManage(firm, userId);
 
             const existing = await this.prisma.firmMember.findFirst({
-                where: {firmId: firm.id, inviteEmail: dto.email},
+                where: {firmId: firm.id, inviteEmail: dto.email, status: FirmMemberStatus.PENDING},
             });
 
-            if (existing) throw new BadRequestException('Ya existe una invitación para ese correo en este despacho');
+            if (existing) throw new BadRequestException('Ya existe una invitación pendiente para ese correo en este despacho');
 
             const inviteToken     = crypto.randomBytes(32).toString('hex');
             const inviteExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -218,6 +219,16 @@ export class FirmService
             if (member.inviteEmail && user?.email !== member.inviteEmail)
                 throw new ForbiddenException('Esta invitación no corresponde a tu cuenta');
 
+            const alreadyMember = await this.prisma.firmMember.findFirst({
+                where: {firmId: member.firmId, userId, status: FirmMemberStatus.ACTIVE},
+            });
+
+            if (alreadyMember)
+            {
+                await this.prisma.firmMember.delete({where: {id: member.id}});
+                throw new BadRequestException('Ya eres miembro activo de este despacho');
+            }
+
             await this.prisma.firmMember.update({
                 where: {id: member.id},
                 data: {
@@ -234,6 +245,7 @@ export class FirmService
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            if (error instanceof Prisma.PrismaClientKnownRequestError) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

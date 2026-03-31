@@ -3,6 +3,7 @@ import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {CreateBranchDto} from './dto/create-branch.dto';
 import {UpdateBranchDto} from './dto/update-branch.dto';
+import {BranchFiltersDto} from './dto/branch-filters.dto';
 import {LegalBranchEntity} from './entities/legal-branch.entity';
 
 @Injectable()
@@ -13,7 +14,7 @@ export class BranchService
         private readonly firmService: FirmService,
     ) {}
 
-    async findAll(userId: string, firmId?: string): Promise<LegalBranchEntity[]>
+    async findAll(userId: string, firmId?: string, filters: BranchFiltersDto = {}): Promise<LegalBranchEntity[]>
     {
         try
         {
@@ -22,12 +23,15 @@ export class BranchService
             return this.prisma.legalBranch.findMany({
                 where: {
                     deletedAt: null,
+                    ...(filters.slug     !== undefined && {slug:     filters.slug}),
+                    ...(filters.isActive !== undefined && {isActive: filters.isActive}),
                     OR: [
                         {isSystem: true},
                         {firmId: firm.id},
                     ],
                 },
                 orderBy: [{sortOrder: 'asc'}, {name: 'asc'}],
+                take: filters.limit ?? 50,
             });
         }
         catch (error)

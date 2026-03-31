@@ -77,4 +77,9 @@ export class UpdateDocumentDto
         enum: DocumentStatus,
     })
     status?: DocumentStatus;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'ID del proceso legal asociado (null para desasociar)', example: 'uuid-v4', required: false})
+    processId?: string | null;
 }

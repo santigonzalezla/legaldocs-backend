@@ -1,5 +1,5 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {Type} from 'class-transformer';
+import {Transform, Type} from 'class-transformer';
 import {IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min} from 'class-validator';
 import {TemplateOrigin} from '../../../../generated/prisma/client';
 
@@ -25,6 +25,7 @@ export class TemplateFiltersDto
     @ApiProperty({description: 'Buscar por título de la plantilla', required: false})
     search?: string;
 
+    @Transform(({value}) => value === 'true')
     @IsBoolean()
     @IsOptional()
     @ApiProperty({description: 'Filtrar solo plantillas activas', required: false})

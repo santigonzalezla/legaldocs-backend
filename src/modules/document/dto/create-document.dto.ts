@@ -36,4 +36,9 @@ export class CreateDocumentDto
     @IsBoolean()
     @IsOptional()
     hasCustomContent?: boolean;
+
+    @ApiProperty({description: 'ID del proceso legal asociado', example: 'uuid-v4', required: false})
+    @IsUUID()
+    @IsOptional()
+    processId?: string;
 }

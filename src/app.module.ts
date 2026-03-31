@@ -15,6 +15,9 @@ import {TemplateModule} from './modules/template/template.module';
 import {SignatureModule} from './modules/signature/signature.module';
 import {SubscriptionModule} from './modules/subscription/subscription.module';
 import {BranchModule} from './modules/branch/branch.module';
+import {ClientModule} from './modules/client/client.module';
+import {ProcessModule} from './modules/process/process.module';
+import {TimeEntryModule} from './modules/time-entry/time-entry.module';
 import {MailModule} from './utils/mail/mail.module';
 
 @Module({
@@ -28,6 +31,9 @@ import {MailModule} from './utils/mail/mail.module';
         SignatureModule,
         SubscriptionModule,
         BranchModule,
+        ClientModule,
+        ProcessModule,
+        TimeEntryModule,
         MailModule,
     ],
     providers: [

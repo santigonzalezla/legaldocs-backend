@@ -84,6 +84,20 @@ enum LogContext {
     SUBSCRIPTIONS
     SYSTEM
     SECURITY
+    CLIENTS
+    PROCESSES
+}
+
+enum ClientType {
+    INDIVIDUAL
+    COMPANY
+}
+
+enum ProcessStatus {
+    ACTIVE
+    IN_REVIEW
+    CLOSED
+    ARCHIVED
 }
 
 enum ActionType {
@@ -96,6 +110,11 @@ enum ActionType {
     EXPORT
     IMPORT
     RESTORE
+}
+
+enum TimeEntryType {
+    AUTO
+    MANUAL
 }
 
 // USUARIO Y AUTENTICACION
@@ -127,6 +146,10 @@ model User {
     templateFavorites TemplateFavorite[]
     documentFavorites DocumentFavorite[]
     logs              Log[]
+    createdClients    Client[]       @relation("ClientCreator")
+    createdProcesses  LegalProcess[] @relation("ProcessCreator")
+    assignedProcesses LegalProcess[] @relation("ProcessAssignee")
+    timeEntries       TimeEntry[]
 
     @@index([deletedAt])
     @@map("USER")
@@ -235,6 +258,9 @@ model Firm {
     subscription   Subscription?
     invoices       Invoice[]
     paymentMethods PaymentMethod[]
+    clients        Client[]
+    legalProcesses LegalProcess[]
+    timeEntries    TimeEntry[]
 
     @@index([deletedAt])
     @@map("FIRM")
@@ -290,9 +316,10 @@ model LegalBranch {
     createdAt   DateTime  @default(now()) @map("DTM_CREATED_AT")
     updatedAt   DateTime  @updatedAt @map("DTM_UPDATED_AT")
 
-    firm      Firm?              @relation(fields: [firmId], references: [id], onDelete: Cascade)
-    templates DocumentTemplate[]
-    documents Document[]
+    firm           Firm?              @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    templates      DocumentTemplate[]
+    documents      Document[]
+    legalProcesses LegalProcess[]
 
     @@index([slug])
     @@index([firmId])
@@ -323,12 +350,14 @@ model DocumentTemplate {
     createdAt             DateTime       @default(now()) @map("DTM_CREATED_AT")
     updatedAt             DateTime       @updatedAt @map("DTM_UPDATED_AT")
 
-    branch         LegalBranch        @relation(fields: [branchId], references: [id])
-    firm           Firm?              @relation(fields: [firmId], references: [id], onDelete: Cascade)
-    parentTemplate DocumentTemplate?  @relation("TemplateCopies", fields: [parentTemplateId], references: [id])
-    copies         DocumentTemplate[] @relation("TemplateCopies")
-    documents      Document[]
-    favorites      TemplateFavorite[]
+    branch                  LegalBranch              @relation(fields: [branchId], references: [id])
+    firm                    Firm?                    @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    parentTemplate          DocumentTemplate?        @relation("TemplateCopies", fields: [parentTemplateId], references: [id])
+    copies                  DocumentTemplate[]       @relation("TemplateCopies")
+    documents               Document[]
+    favorites               TemplateFavorite[]
+    processTemplates        ProcessTemplate[]
+    clientFrequentTemplates ClientFrequentTemplate[]
 
     @@index([branchId])
     @@index([firmId])
@@ -370,17 +399,21 @@ model Document {
     createdAt        DateTime       @default(now()) @map("DTM_CREATED_AT")
     updatedAt        DateTime       @updatedAt @map("DTM_UPDATED_AT")
 
+    processId        String?        @map("UID_LEGAL_PROCESS_DOCUMENT")
+
     template  DocumentTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
     branch    LegalBranch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
     firm      Firm               @relation(fields: [firmId], references: [id])
     author    User               @relation(fields: [createdBy], references: [id])
     favorites DocumentFavorite[]
+    process   LegalProcess?      @relation(fields: [processId], references: [id], onDelete: SetNull)
 
     @@index([firmId])
     @@index([status])
     @@index([deletedAt])
     @@index([createdBy])
     @@index([branchId])
+    @@index([processId])
     @@map("DOCUMENT")
 }
 
@@ -536,4 +569,130 @@ model Log {
     @@index([userId])
     @@index([userId, timestamp])
     @@map("LOG")
+}
+
+// CLIENTES
+model Client {
+    id             String     @id @default(uuid()) @map("UID_CLIENT")
+    numId          Int        @unique @default(autoincrement()) @map("NUM_ID_CLIENT")
+    firmId         String     @map("UID_FIRM")
+    type           ClientType @map("STR_TYPE_CLIENT")
+    firstName      String?    @map("STR_FIRST_NAME_CLIENT")
+    lastName       String?    @map("STR_LAST_NAME_CLIENT")
+    companyName    String?    @map("STR_COMPANY_NAME_CLIENT")
+    documentType   String?    @map("STR_DOCUMENT_TYPE_CLIENT")
+    documentNumber String?    @map("STR_DOCUMENT_NUMBER_CLIENT")
+    email          String?    @map("STR_EMAIL_CLIENT")
+    phone          String?    @map("STR_PHONE_CLIENT")
+    address        String?    @map("STR_ADDRESS_CLIENT")
+    city           String?    @map("STR_CITY_CLIENT")
+    createdBy      String     @map("UID_CREATED_BY_CLIENT")
+    deletedAt      DateTime?  @map("DTM_DELETED_AT_CLIENT")
+    createdAt      DateTime   @default(now()) @map("DTM_CREATED_AT")
+    updatedAt      DateTime   @updatedAt @map("DTM_UPDATED_AT")
+
+    firm              Firm                     @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    creator           User                     @relation("ClientCreator", fields: [createdBy], references: [id])
+    legalProcesses    LegalProcess[]
+    frequentTemplates ClientFrequentTemplate[]
+
+    @@index([firmId])
+    @@index([type])
+    @@index([deletedAt])
+    @@map("CLIENT")
+}
+
+// PROCESOS LEGALES
+model LegalProcess {
+    id          String        @id @default(uuid()) @map("UID_LEGAL_PROCESS")
+    numId       Int           @unique @default(autoincrement()) @map("NUM_ID_LEGAL_PROCESS")
+    firmId      String        @map("UID_FIRM")
+    clientId    String        @map("UID_CLIENT")
+    title       String        @map("STR_TITLE_LEGAL_PROCESS")
+    description String?       @map("STR_DESCRIPTION_LEGAL_PROCESS")
+    reference   String?       @map("STR_REFERENCE_LEGAL_PROCESS")
+    branchId    String?       @map("UID_LEGAL_BRANCH")
+    status      ProcessStatus @default(ACTIVE) @map("STR_STATUS_LEGAL_PROCESS")
+    court       String?       @map("STR_COURT_LEGAL_PROCESS")
+    counterpart String?       @map("STR_COUNTERPART_LEGAL_PROCESS")
+    startDate   DateTime?     @map("DTM_START_DATE_LEGAL_PROCESS")
+    endDate     DateTime?     @map("DTM_END_DATE_LEGAL_PROCESS")
+    assignedTo  String?       @map("UID_ASSIGNED_TO_LEGAL_PROCESS")
+    createdBy   String        @map("UID_CREATED_BY_LEGAL_PROCESS")
+    deletedAt   DateTime?     @map("DTM_DELETED_AT_LEGAL_PROCESS")
+    createdAt   DateTime      @default(now()) @map("DTM_CREATED_AT")
+    updatedAt   DateTime      @updatedAt @map("DTM_UPDATED_AT")
+
+    firm        Firm              @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    client      Client            @relation(fields: [clientId], references: [id])
+    branch      LegalBranch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+    assignee    User?             @relation("ProcessAssignee", fields: [assignedTo], references: [id])
+    creator     User              @relation("ProcessCreator", fields: [createdBy], references: [id])
+    documents   Document[]
+    templates   ProcessTemplate[]
+    timeEntries TimeEntry[]
+
+    @@index([firmId])
+    @@index([clientId])
+    @@index([status])
+    @@index([assignedTo])
+    @@index([deletedAt])
+    @@map("LEGAL_PROCESS")
+}
+
+model ProcessTemplate {
+    id         String   @id @default(uuid()) @map("UID_PROCESS_TEMPLATE")
+    processId  String   @map("UID_LEGAL_PROCESS")
+    templateId String   @map("UID_DOCUMENT_TEMPLATE")
+    sortOrder  Int      @default(0) @map("NUM_SORT_ORDER_PROCESS_TEMPLATE")
+    isRequired Boolean  @default(false) @map("BOOL_IS_REQUIRED_PROCESS_TEMPLATE")
+    createdAt  DateTime @default(now()) @map("DTM_CREATED_AT")
+
+    process  LegalProcess     @relation(fields: [processId], references: [id], onDelete: Cascade)
+    template DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+    @@unique([processId, templateId])
+    @@map("PROCESS_TEMPLATE")
+}
+
+model ClientFrequentTemplate {
+    id         String   @id @default(uuid()) @map("UID_CLIENT_FREQUENT_TEMPLATE")
+    clientId   String   @map("UID_CLIENT")
+    templateId String   @map("UID_DOCUMENT_TEMPLATE")
+    useCount   Int      @default(1) @map("NUM_USE_COUNT_CLIENT_FREQUENT_TEMPLATE")
+    lastUsedAt DateTime @default(now()) @map("DTM_LAST_USED_AT_CLIENT_FREQUENT_TEMPLATE")
+    createdAt  DateTime @default(now()) @map("DTM_CREATED_AT")
+    updatedAt  DateTime @updatedAt @map("DTM_UPDATED_AT")
+
+    client   Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+    template DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+    @@unique([clientId, templateId])
+    @@map("CLIENT_FREQUENT_TEMPLATE")
+}
+
+// CONTROL DE TIEMPO
+model TimeEntry {
+    id              String        @id @default(uuid()) @map("UID_TIME_ENTRY")
+    numId           Int           @unique @default(autoincrement()) @map("NUM_ID_TIME_ENTRY")
+    processId       String        @map("UID_LEGAL_PROCESS")
+    userId          String        @map("UID_USER")
+    firmId          String        @map("UID_FIRM")
+    type            TimeEntryType @default(MANUAL) @map("STR_TYPE_TIME_ENTRY")
+    description     String?       @map("STR_DESCRIPTION_TIME_ENTRY")
+    startedAt       DateTime      @map("DTM_STARTED_AT_TIME_ENTRY")
+    endedAt         DateTime?     @map("DTM_ENDED_AT_TIME_ENTRY")
+    durationMinutes Int?          @map("NUM_DURATION_MINUTES_TIME_ENTRY")
+    createdAt       DateTime      @default(now()) @map("DTM_CREATED_AT")
+    updatedAt       DateTime      @updatedAt @map("DTM_UPDATED_AT")
+
+    process LegalProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+    user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    firm    Firm         @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+    @@index([processId])
+    @@index([userId])
+    @@index([firmId])
+    @@index([endedAt])
+    @@map("TIME_ENTRY")
 }
