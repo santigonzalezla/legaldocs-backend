@@ -43,11 +43,10 @@ async function bootstrap()
         .setDescription('API documentation for LegalDocs')
         .setVersion('1.0')
         .addTag('Documentation')
+        .addServer(`http://localhost:${environmentVariables.port}`, 'Development')
         .addServer(
-            environmentVariables.nodeEnv === 'production'
-                ? environmentVariables.frontendUrl?.replace('/api', '') ?? ''
-                : `http://localhost:${environmentVariables.port}`,
-            environmentVariables.nodeEnv === 'production' ? 'Production' : 'Development',
+            `https://${process.env.RAILWAY_PUBLIC_DOMAIN ?? ''}`,
+            'Production (Railway)',
         )
         .addBearerAuth({
             type: 'http',
