@@ -9,12 +9,24 @@ async function bootstrap()
     const logger = new Logger("LegalDocs Backend");
     const app = await NestFactory.create(AppModule);
 
+    const allowedOrigins = [
+        // Local development
+        /^https?:\/\/localhost(:\d+)?$/,
+        // Production domain (any subdomain of legaldocs.com.co)
+        /^https:\/\/([\w-]+\.)?legaldocs\.com\.co$/,
+        // Railway deployments (frontend preview & production)
+        /^https:\/\/[\w-]+\.up\.railway\.app$/,
+    ];
+
     app.enableCors({
-        origin:      environmentVariables.nodeEnv === 'production'
-                         ? environmentVariables.frontendUrl
-                         : true,
-        credentials: true,
-        methods:     ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+        origin: (origin, callback) =>
+        {
+            if (!origin) return callback(null, true);
+            const allowed = allowedOrigins.some(pattern => pattern.test(origin));
+            callback(allowed ? null : new Error(`CORS blocked: ${origin}`), allowed);
+        },
+        credentials:    true,
+        methods:        ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Firm-Id'],
     });
 
@@ -31,8 +43,12 @@ async function bootstrap()
         .setDescription('API documentation for LegalDocs')
         .setVersion('1.0')
         .addTag('Documentation')
-        //.addServer('', 'Production')
-        .addServer(`http://localhost:${environmentVariables.port}`, 'Development')
+        .addServer(
+            environmentVariables.nodeEnv === 'production'
+                ? environmentVariables.frontendUrl?.replace('/api', '') ?? ''
+                : `http://localhost:${environmentVariables.port}`,
+            environmentVariables.nodeEnv === 'production' ? 'Production' : 'Development',
+        )
         .addBearerAuth({
             type: 'http',
             scheme: 'bearer',
