@@ -19,6 +19,14 @@ interface EnvironmentVariables
     FRONTEND_URL: string;
     RESEND_API_KEY: string;
     RESEND_FROM: string;
+    // Cloudflare R2
+    R2_ACCOUNT_ID: string;
+    R2_BUCKET: string;
+    R2_ACCESS_KEY_ID: string;
+    R2_SECRET_ACCESS_KEY: string;
+    R2_PUBLIC_URL: string;
+    // AI
+    OPENAI_API_KEY: string;
 }
 
 const environmentSchema = joi.object({
@@ -38,6 +46,12 @@ const environmentSchema = joi.object({
     FRONTEND_URL: joi.string().required(),
     RESEND_API_KEY: joi.string().required(),
     RESEND_FROM: joi.string().email().required(),
+    R2_ACCOUNT_ID: joi.string().required(),
+    R2_BUCKET: joi.string().required(),
+    R2_ACCESS_KEY_ID: joi.string().required(),
+    R2_SECRET_ACCESS_KEY: joi.string().required(),
+    R2_PUBLIC_URL: joi.string().required(),
+    OPENAI_API_KEY: joi.string().required()
 }).unknown();
 
 const {error, value} = environmentSchema.validate({...process.env});
@@ -63,4 +77,10 @@ export const environmentVariables = {
     frontendUrl: env.FRONTEND_URL,
     resendApiKey: env.RESEND_API_KEY,
     resendFrom: env.RESEND_FROM,
+    r2AccountId: env.R2_ACCOUNT_ID,
+    r2Bucket: env.R2_BUCKET,
+    r2AccessKeyId: env.R2_ACCESS_KEY_ID,
+    r2SecretAccessKey: env.R2_SECRET_ACCESS_KEY,
+    r2PublicUrl: env.R2_PUBLIC_URL,
+    openaiApiKey: env.OPENAI_API_KEY
 };

@@ -59,7 +59,11 @@ export class FirmService
 
             if (existing) throw new BadRequestException('Ya tienes un despacho registrado');
 
-            return this.prisma.firm.create({
+            const basicPlan = await this.prisma.subscriptionPlan.findFirst({
+                where: {name: 'basic', isActive: true},
+            });
+
+            const firm = await this.prisma.firm.create({
                 data: {
                     ...dto,
                     createdBy: userId,
@@ -73,6 +77,22 @@ export class FirmService
                     },
                 },
             });
+
+            if (basicPlan)
+            {
+                await this.prisma.subscription.create({
+                    data: {
+                        firmId:      firm.id,
+                        planId:      basicPlan.id,
+                        billingCycle: 'MONTHLY',
+                        status:      'TRIAL',
+                        startDate:   new Date(),
+                        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+                    },
+                });
+            }
+
+            return firm;
         }
         catch (error)
         {

@@ -1,4 +1,4 @@
-import {HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {StartTimerDto} from './dto/start-timer.dto';
@@ -8,6 +8,8 @@ import {TimeEntryEntity, TimeEntryWithUserEntity} from './entities/time-entry.en
 @Injectable()
 export class TimeEntryService
 {
+    private readonly logger = new Logger(TimeEntryService.name);
+
     constructor(
         private readonly prisma:       PrismaService,
         private readonly firmService:  FirmService,
@@ -26,7 +28,7 @@ export class TimeEntryService
             if (existing)
                 throw new HttpException('Ya tienes un conteo activo en este proceso', 400);
 
-            return this.prisma.timeEntry.create({
+            const result = await this.prisma.timeEntry.create({
                 data: {
                     processId: dto.processId,
                     userId,
@@ -35,10 +37,14 @@ export class TimeEntryService
                     startedAt: new Date(),
                 },
             });
+
+            this.logger.log(`startTimer → success userId=${userId} processId=${dto.processId}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`startTimer → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -58,14 +64,18 @@ export class TimeEntryService
             const endedAt       = new Date();
             const durationMinutes = Math.max(1, Math.round((endedAt.getTime() - entry.startedAt.getTime()) / 60_000));
 
-            return this.prisma.timeEntry.update({
+            const result = await this.prisma.timeEntry.update({
                 where: {id},
                 data:  {endedAt, durationMinutes},
             });
+
+            this.logger.log(`stopTimer → success id=${id} duration=${durationMinutes}min`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`stopTimer → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -77,7 +87,7 @@ export class TimeEntryService
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
             const now = new Date();
-            return this.prisma.timeEntry.create({
+            const result = await this.prisma.timeEntry.create({
                 data: {
                     processId:       dto.processId,
                     userId,
@@ -89,10 +99,14 @@ export class TimeEntryService
                     durationMinutes: dto.durationMinutes,
                 },
             });
+
+            this.logger.log(`addManual → success userId=${userId} processId=${dto.processId}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`addManual → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -103,15 +117,19 @@ export class TimeEntryService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            return this.prisma.timeEntry.findMany({
+            const result = await this.prisma.timeEntry.findMany({
                 where:   {processId, firmId: firm.id},
                 include: {user: {select: {firstName: true, lastName: true}}},
                 orderBy: {startedAt: 'desc'},
             }) as unknown as TimeEntryWithUserEntity[];
+
+            this.logger.log(`findByProcess → success processId=${processId} count=${result.length}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findByProcess → failed processId=${processId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -130,11 +148,13 @@ export class TimeEntryService
 
             await this.prisma.timeEntry.delete({where: {id}});
 
+            this.logger.log(`remove → success id=${id}`);
             return {message: 'Registro eliminado correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`remove → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -185,16 +205,20 @@ export class TimeEntryService
                 .map(([pid, d]) => ({processId: pid, title: d.title, totalMinutes: d.totalMinutes, entryCount: d.entryCount, userCount: d.userIds.size}))
                 .sort((a, b) => b.totalMinutes - a.totalMinutes);
 
-            return {
+            const analytics = {
                 byUser,
                 byProcess,
                 totalMinutes: byUser.reduce((acc, u) => acc + u.totalMinutes, 0),
                 totalEntries: entries.length,
             };
+
+            this.logger.log(`getAnalytics → success firmId=${firm.id} entries=${entries.length}`);
+            return analytics;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`getAnalytics → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

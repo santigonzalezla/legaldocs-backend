@@ -1,4 +1,4 @@
-import {HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {CreateBranchDto} from './dto/create-branch.dto';
@@ -9,6 +9,8 @@ import {LegalBranchEntity} from './entities/legal-branch.entity';
 @Injectable()
 export class BranchService
 {
+    private readonly logger = new Logger(BranchService.name);
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly firmService: FirmService,
@@ -20,7 +22,7 @@ export class BranchService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            return this.prisma.legalBranch.findMany({
+            const result = await this.prisma.legalBranch.findMany({
                 where: {
                     deletedAt: null,
                     ...(filters.slug     !== undefined && {slug:     filters.slug}),
@@ -33,10 +35,14 @@ export class BranchService
                 orderBy: [{sortOrder: 'asc'}, {name: 'asc'}],
                 take: filters.limit ?? 50,
             });
+
+            this.logger.log(`findAll → success firmId=${firm.id} count=${result.length}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findAll → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -47,17 +53,21 @@ export class BranchService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            return this.prisma.legalBranch.create({
+            const result = await this.prisma.legalBranch.create({
                 data: {
                     ...dto,
                     firmId:   firm.id,
                     isSystem: false,
                 },
             });
+
+            this.logger.log(`create → success firmId=${firm.id} id=${result.id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`create → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -68,14 +78,18 @@ export class BranchService
         {
             await this.findFirmBranch(userId, firmId, id);
 
-            return this.prisma.legalBranch.update({
+            const result = await this.prisma.legalBranch.update({
                 where: {id},
                 data: dto,
             });
+
+            this.logger.log(`update → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`update → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -91,11 +105,13 @@ export class BranchService
                 data: {deletedAt: new Date()},
             });
 
+            this.logger.log(`remove → success id=${id}`);
             return {message: 'Rama jurídica eliminada correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`remove → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

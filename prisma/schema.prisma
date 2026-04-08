@@ -117,6 +117,18 @@ enum TimeEntryType {
     MANUAL
 }
 
+enum LibraryDocumentType {
+    LAW
+    DECREE
+    RESOLUTION
+    CIRCULAR
+    RULING
+    JURISPRUDENCE
+    DOCTRINE
+    CONTRACT
+    OTHER
+}
+
 // USUARIO Y AUTENTICACION
 model User {
     id            String    @id @default(uuid()) @map("UID_USER")
@@ -146,10 +158,11 @@ model User {
     templateFavorites TemplateFavorite[]
     documentFavorites DocumentFavorite[]
     logs              Log[]
-    createdClients    Client[]       @relation("ClientCreator")
-    createdProcesses  LegalProcess[] @relation("ProcessCreator")
-    assignedProcesses LegalProcess[] @relation("ProcessAssignee")
+    createdClients    Client[]                 @relation("ClientCreator")
+    createdProcesses  LegalProcess[]           @relation("ProcessCreator")
+    assignedProcesses LegalProcess[]           @relation("ProcessAssignee")
     timeEntries       TimeEntry[]
+    libraryDocuments  LibraryDocument[]
 
     @@index([deletedAt])
     @@map("USER")
@@ -250,17 +263,18 @@ model Firm {
     createdAt     DateTime  @default(now()) @map("DTM_CREATED_AT")
     updatedAt     DateTime  @updatedAt @map("DTM_UPDATED_AT")
 
-    specialties    FirmSpecialty[]
-    members        FirmMember[]
-    documents      Document[]
-    templates      DocumentTemplate[]
-    legalBranches  LegalBranch[]
-    subscription   Subscription?
-    invoices       Invoice[]
-    paymentMethods PaymentMethod[]
-    clients        Client[]
-    legalProcesses LegalProcess[]
-    timeEntries    TimeEntry[]
+    specialties      FirmSpecialty[]
+    members          FirmMember[]
+    documents        Document[]
+    templates        DocumentTemplate[]
+    legalBranches    LegalBranch[]
+    subscription     Subscription?
+    invoices         Invoice[]
+    paymentMethods   PaymentMethod[]
+    clients          Client[]
+    legalProcesses   LegalProcess[]
+    timeEntries      TimeEntry[]
+    libraryDocuments LibraryDocument[]
 
     @@index([deletedAt])
     @@map("FIRM")
@@ -316,10 +330,11 @@ model LegalBranch {
     createdAt   DateTime  @default(now()) @map("DTM_CREATED_AT")
     updatedAt   DateTime  @updatedAt @map("DTM_UPDATED_AT")
 
-    firm           Firm?              @relation(fields: [firmId], references: [id], onDelete: Cascade)
-    templates      DocumentTemplate[]
-    documents      Document[]
-    legalProcesses LegalProcess[]
+    firm             Firm?              @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    templates        DocumentTemplate[]
+    documents        Document[]
+    legalProcesses   LegalProcess[]
+    libraryDocuments LibraryDocument[]
 
     @@index([slug])
     @@index([firmId])
@@ -399,7 +414,7 @@ model Document {
     createdAt        DateTime       @default(now()) @map("DTM_CREATED_AT")
     updatedAt        DateTime       @updatedAt @map("DTM_UPDATED_AT")
 
-    processId        String?        @map("UID_LEGAL_PROCESS_DOCUMENT")
+    processId String? @map("UID_LEGAL_PROCESS_DOCUMENT")
 
     template  DocumentTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
     branch    LegalBranch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -459,10 +474,13 @@ model SubscriptionPlan {
     description   String?  @map("STR_DESCRIPTION_PLAN")
     priceMonthly  Decimal? @map("NUM_PRICE_MONTHLY_PLAN")
     priceAnnually Decimal? @map("NUM_PRICE_ANNUALLY_PLAN")
-    maxDocuments  Int?     @map("NUM_MAX_DOCUMENTS_PLAN")
-    maxUsers      Int?     @map("NUM_MAX_USERS_PLAN")
-    maxTemplates  Int?     @map("NUM_MAX_TEMPLATES_PLAN")
-    features      Json     @default("[]") @map("JSON_FEATURES_PLAN")
+    maxDocuments      Int?     @map("NUM_MAX_DOCUMENTS_PLAN")
+    maxUsers          Int?     @map("NUM_MAX_USERS_PLAN")
+    maxTemplates      Int?     @map("NUM_MAX_TEMPLATES_PLAN")
+    maxAiTokensDaily  Int?     @map("NUM_MAX_AI_TOKENS_DAILY_PLAN")
+    maxAiTokensWeekly Int?     @map("NUM_MAX_AI_TOKENS_WEEKLY_PLAN")
+    maxAiTokensMonthly Int?    @map("NUM_MAX_AI_TOKENS_MONTHLY_PLAN")
+    features          Json     @default("[]") @map("JSON_FEATURES_PLAN")
     isActive      Boolean  @default(true) @map("BOOL_IS_ACTIVE_PLAN")
     sortOrder     Int      @default(0) @map("NUM_SORT_ORDER_PLAN")
     createdAt     DateTime @default(now()) @map("DTM_CREATED_AT")
@@ -482,9 +500,15 @@ model Subscription {
     startDate    DateTime           @map("DTM_START_DATE_SUBSCRIPTION")
     endDate      DateTime?          @map("DTM_END_DATE_SUBSCRIPTION")
     trialEndsAt  DateTime?          @map("DTM_TRIAL_ENDS_AT_SUBSCRIPTION")
-    cancelledAt  DateTime?          @map("DTM_CANCELLED_AT_SUBSCRIPTION")
-    createdAt    DateTime           @default(now()) @map("DTM_CREATED_AT")
-    updatedAt    DateTime           @updatedAt @map("DTM_UPDATED_AT")
+    cancelledAt              DateTime?          @map("DTM_CANCELLED_AT_SUBSCRIPTION")
+    aiTokensUsedDaily        Int                @default(0) @map("NUM_AI_TOKENS_USED_DAILY_SUBSCRIPTION")
+    aiTokensDailyResetAt     DateTime?          @map("DTM_AI_TOKENS_DAILY_RESET_AT_SUBSCRIPTION")
+    aiTokensUsedWeekly       Int                @default(0) @map("NUM_AI_TOKENS_USED_WEEKLY_SUBSCRIPTION")
+    aiTokensWeeklyResetAt    DateTime?          @map("DTM_AI_TOKENS_WEEKLY_RESET_AT_SUBSCRIPTION")
+    aiTokensUsedMonthly      Int                @default(0) @map("NUM_AI_TOKENS_USED_MONTHLY_SUBSCRIPTION")
+    aiTokensMonthlyResetAt   DateTime?          @map("DTM_AI_TOKENS_MONTHLY_RESET_AT_SUBSCRIPTION")
+    createdAt                DateTime           @default(now()) @map("DTM_CREATED_AT")
+    updatedAt                DateTime           @updatedAt @map("DTM_UPDATED_AT")
 
     firm     Firm             @relation(fields: [firmId], references: [id])
     plan     SubscriptionPlan @relation(fields: [planId], references: [id])
@@ -695,4 +719,51 @@ model TimeEntry {
     @@index([firmId])
     @@index([endedAt])
     @@map("TIME_ENTRY")
+}
+
+// BIBLIOTECA JURIDICA (LEGALITO RAG)
+model LibraryDocument {
+    id          String              @id @default(uuid()) @map("UID_LIBRARY_DOCUMENT")
+    numId       Int                 @unique @default(autoincrement()) @map("NUM_ID_LIBRARY_DOCUMENT")
+    firmId      String              @map("UID_FIRM")
+    uploadedBy  String              @map("UID_UPLOADED_BY_LIBRARY_DOCUMENT")
+    title       String              @map("STR_TITLE_LIBRARY_DOCUMENT")
+    description String?             @map("STR_DESCRIPTION_LIBRARY_DOCUMENT")
+    type        LibraryDocumentType @map("STR_TYPE_LIBRARY_DOCUMENT")
+    fileKey     String              @map("STR_FILE_KEY_LIBRARY_DOCUMENT")
+    fileUrl     String              @map("STR_FILE_URL_LIBRARY_DOCUMENT")
+    fileName    String              @map("STR_FILE_NAME_LIBRARY_DOCUMENT")
+    fileSize    Int                 @map("NUM_FILE_SIZE_LIBRARY_DOCUMENT")
+    mimeType    String              @map("STR_MIME_TYPE_LIBRARY_DOCUMENT")
+    isIndexed   Boolean             @default(false) @map("BOOL_IS_INDEXED_LIBRARY_DOCUMENT")
+    branchId    String?             @map("UID_LEGAL_BRANCH_LIBRARY_DOCUMENT")
+    deletedAt   DateTime?           @map("DTM_DELETED_AT_LIBRARY_DOCUMENT")
+    createdAt   DateTime            @default(now()) @map("DTM_CREATED_AT")
+    updatedAt   DateTime            @updatedAt @map("DTM_UPDATED_AT")
+
+    firm     Firm           @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    uploader User           @relation(fields: [uploadedBy], references: [id])
+    branch   LegalBranch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+    chunks   LibraryChunk[]
+
+    @@index([firmId])
+    @@index([type])
+    @@index([isIndexed])
+    @@index([branchId])
+    @@index([deletedAt])
+    @@map("LIBRARY_DOCUMENT")
+}
+
+model LibraryChunk {
+    id         String                      @id @default(uuid()) @map("UID_LIBRARY_CHUNK")
+    documentId String                      @map("UID_LIBRARY_DOCUMENT")
+    chunkIndex Int                         @map("NUM_CHUNK_INDEX_LIBRARY_CHUNK")
+    content    String                      @map("STR_CONTENT_LIBRARY_CHUNK")
+    embedding  Unsupported("vector(1536)")
+    createdAt  DateTime                    @default(now()) @map("DTM_CREATED_AT")
+
+    document LibraryDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+    @@index([documentId])
+    @@map("LIBRARY_CHUNK")
 }

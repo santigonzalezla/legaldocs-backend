@@ -1,5 +1,5 @@
 import * as argon2 from 'argon2';
-import {BadRequestException, HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {BadRequestException, HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {UpdateProfileDto} from './dto/update-profile.dto';
 import {ChangePasswordDto} from './dto/change-password.dto';
@@ -12,6 +12,8 @@ import {SecuritySettingsEntity} from './entities/security-settings.entity';
 @Injectable()
 export class UserService
 {
+    private readonly logger = new Logger(UserService.name);
+
     constructor(private readonly prisma: PrismaService) {}
 
     async findMe(userId: string): Promise<UserEntity>
@@ -24,11 +26,13 @@ export class UserService
 
             if (!user) throw new NotFoundException('Usuario no encontrado');
 
+            this.logger.log(`findMe → success userId=${userId}`);
             return user;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findMe → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -43,17 +47,21 @@ export class UserService
 
             if (!user) throw new NotFoundException('Usuario no encontrado');
 
-            return this.prisma.user.update({
+            const result = await this.prisma.user.update({
                 where: {id: userId},
                 data: {
                     ...dto,
                     birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
                 },
             });
+
+            this.logger.log(`updateProfile → success userId=${userId}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`updateProfile → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -80,11 +88,13 @@ export class UserService
                 data: {password: hashed},
             });
 
+            this.logger.log(`changePassword → success userId=${userId}`);
             return {message: 'Contraseña actualizada correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`changePassword → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -99,11 +109,13 @@ export class UserService
 
             if (!prefs) throw new NotFoundException('Preferencias de notificación no encontradas');
 
+            this.logger.log(`getNotificationPrefs → success userId=${userId}`);
             return prefs;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`getNotificationPrefs → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -112,14 +124,18 @@ export class UserService
     {
         try
         {
-            return this.prisma.notificationPreferences.update({
+            const result = await this.prisma.notificationPreferences.update({
                 where: {userId},
                 data: dto,
             });
+
+            this.logger.log(`updateNotificationPrefs → success userId=${userId}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`updateNotificationPrefs → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -134,11 +150,13 @@ export class UserService
 
             if (!settings) throw new NotFoundException('Configuración de seguridad no encontrada');
 
+            this.logger.log(`getSecuritySettings → success userId=${userId}`);
             return settings;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`getSecuritySettings → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -147,14 +165,18 @@ export class UserService
     {
         try
         {
-            return this.prisma.securitySettings.update({
+            const result = await this.prisma.securitySettings.update({
                 where: {userId},
                 data: dto,
             });
+
+            this.logger.log(`updateSecuritySettings → success userId=${userId}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`updateSecuritySettings → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -174,11 +196,13 @@ export class UserService
                 data: {deletedAt: new Date()},
             });
 
+            this.logger.log(`deleteMe → success userId=${userId}`);
             return {message: 'Cuenta eliminada correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`deleteMe → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

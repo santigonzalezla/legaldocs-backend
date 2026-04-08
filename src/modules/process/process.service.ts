@@ -1,4 +1,4 @@
-import {HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {CreateProcessDto} from './dto/create-process.dto';
@@ -12,6 +12,8 @@ import {Paginated} from '../../interfaces/Paginated';
 @Injectable()
 export class ProcessService
 {
+    private readonly logger = new Logger(ProcessService.name);
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly firmService: FirmService,
@@ -23,17 +25,21 @@ export class ProcessService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            return this.prisma.legalProcess.create({
+            const result = await this.prisma.legalProcess.create({
                 data: {
                     ...dto,
                     firmId:    firm.id,
                     createdBy: userId,
                 },
             });
+
+            this.logger.log(`create → success firmId=${firm.id} id=${result.id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`create → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -67,11 +73,13 @@ export class ProcessService
                 this.prisma.legalProcess.count({where}),
             ]);
 
+            this.logger.log(`findAll → success firmId=${firm.id} total=${total}`);
             return {data, total, page, limit};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findAll → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -80,11 +88,14 @@ export class ProcessService
     {
         try
         {
-            return this.findFirmProcess(userId, firmId, id);
+            const result = await this.findFirmProcess(userId, firmId, id);
+            this.logger.log(`findOne → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findOne → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -95,11 +106,14 @@ export class ProcessService
         {
             await this.findFirmProcess(userId, firmId, id);
 
-            return this.prisma.legalProcess.update({where: {id}, data: dto});
+            const result = await this.prisma.legalProcess.update({where: {id}, data: dto});
+            this.logger.log(`update → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`update → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -115,11 +129,13 @@ export class ProcessService
 
             await this.prisma.legalProcess.update({where: {id}, data: {deletedAt: new Date()}});
 
+            this.logger.log(`remove → success id=${id}`);
             return {message: 'Proceso eliminado correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`remove → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -133,11 +149,14 @@ export class ProcessService
             if (!process.deletedAt)
                 throw new HttpException('El proceso no está eliminado', 400);
 
-            return this.prisma.legalProcess.update({where: {id}, data: {deletedAt: null}});
+            const result = await this.prisma.legalProcess.update({where: {id}, data: {deletedAt: null}});
+            this.logger.log(`restore → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`restore → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -148,14 +167,18 @@ export class ProcessService
         {
             await this.findFirmProcess(userId, firmId, id);
 
-            return this.prisma.processTemplate.findMany({
+            const result = await this.prisma.processTemplate.findMany({
                 where:   {processId: id},
                 orderBy: {sortOrder: 'asc'},
             });
+
+            this.logger.log(`getTemplates → success processId=${id} count=${result.length}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`getTemplates → failed processId=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -173,7 +196,7 @@ export class ProcessService
             if (existing)
                 throw new HttpException('La plantilla ya está asociada a este proceso', 400);
 
-            return this.prisma.processTemplate.create({
+            const result = await this.prisma.processTemplate.create({
                 data: {
                     processId:  id,
                     templateId: dto.templateId,
@@ -181,10 +204,14 @@ export class ProcessService
                     isRequired: dto.isRequired ?? false,
                 },
             });
+
+            this.logger.log(`addTemplate → success processId=${id} templateId=${dto.templateId}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`addTemplate → failed processId=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -206,11 +233,13 @@ export class ProcessService
                 where: {processId_templateId: {processId: id, templateId}},
             });
 
+            this.logger.log(`removeTemplate → success processId=${id} templateId=${templateId}`);
             return {message: 'Plantilla desvinculada del proceso'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`removeTemplate → failed processId=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

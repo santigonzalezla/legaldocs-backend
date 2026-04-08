@@ -18,6 +18,8 @@ import {BranchModule} from './modules/branch/branch.module';
 import {ClientModule} from './modules/client/client.module';
 import {ProcessModule} from './modules/process/process.module';
 import {TimeEntryModule} from './modules/time-entry/time-entry.module';
+import {LibraryModule} from './modules/library/library.module';
+import {AiModule} from './modules/ai/ai.module';
 import {MailModule} from './utils/mail/mail.module';
 
 @Module({
@@ -34,6 +36,8 @@ import {MailModule} from './utils/mail/mail.module';
         ClientModule,
         ProcessModule,
         TimeEntryModule,
+        LibraryModule,
+        AiModule,
         MailModule,
     ],
     providers: [

@@ -1,4 +1,4 @@
-import {ForbiddenException, HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {ForbiddenException, HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {CreateDocumentDto} from './dto/create-document.dto';
@@ -9,6 +9,8 @@ import {DocumentEntity} from './entities/document.entity';
 @Injectable()
 export class DocumentService
 {
+    private readonly logger = new Logger(DocumentService.name);
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly firmService: FirmService,
@@ -20,17 +22,21 @@ export class DocumentService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            return this.prisma.document.create({
+            const result = await this.prisma.document.create({
                 data: {
                     ...dto,
                     firmId: firm.id,
                     createdBy: userId,
                 },
             });
+
+            this.logger.log(`create → success firmId=${firm.id} id=${result.id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`create → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -71,11 +77,13 @@ export class DocumentService
                 branchSlug: branch?.slug ?? null,
             }));
 
+            this.logger.log(`findAll → success firmId=${firm.id} total=${total}`);
             return {data, total, page, limit};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findAll → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -94,11 +102,13 @@ export class DocumentService
             if (!document) throw new NotFoundException('Documento no encontrado');
 
             const {branch, ...doc} = document;
+            this.logger.log(`findOne → success id=${id}`);
             return {...doc, branchSlug: branch?.slug ?? null};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findOne → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -109,14 +119,18 @@ export class DocumentService
         {
             await this.findUserDocument(userId, firmId, id);
 
-            return this.prisma.document.update({
+            const result = await this.prisma.document.update({
                 where: {id},
                 data: dto,
             });
+
+            this.logger.log(`update → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`update → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -137,11 +151,13 @@ export class DocumentService
                 data: {deletedAt: new Date(), trashExpiresAt},
             });
 
+            this.logger.log(`remove → success id=${id}`);
             return {message: 'Documento movido a la papelera'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`remove → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -155,14 +171,18 @@ export class DocumentService
             if (!document.deletedAt)
                 throw new ForbiddenException('El documento no está en la papelera');
 
-            return this.prisma.document.update({
+            const result = await this.prisma.document.update({
                 where: {id},
                 data: {deletedAt: null, trashExpiresAt: null},
             });
+
+            this.logger.log(`restore → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`restore → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -178,11 +198,13 @@ export class DocumentService
 
             await this.prisma.document.delete({where: {id}});
 
+            this.logger.log(`permanentRemove → success id=${id}`);
             return {message: 'Documento eliminado permanentemente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`permanentRemove → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -202,6 +224,7 @@ export class DocumentService
                 await this.prisma.documentFavorite.delete({
                     where: {documentId_userId: {documentId: id, userId}},
                 });
+                this.logger.log(`toggleFavorite → removed id=${id} userId=${userId}`);
                 return {isFavorite: false};
             }
 
@@ -209,11 +232,13 @@ export class DocumentService
                 data: {documentId: id, userId},
             });
 
+            this.logger.log(`toggleFavorite → added id=${id} userId=${userId}`);
             return {isFavorite: true};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`toggleFavorite → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

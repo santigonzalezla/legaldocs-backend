@@ -1,4 +1,4 @@
-import {HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {CreateSignatureDto} from './dto/create-signature.dto';
 import {UpdateSignatureDto} from './dto/update-signature.dto';
@@ -7,20 +7,26 @@ import {DigitalSignatureEntity} from './entities/digital-signature.entity';
 @Injectable()
 export class SignatureService
 {
+    private readonly logger = new Logger(SignatureService.name);
+
     constructor(private readonly prisma: PrismaService) {}
 
     async findAll(userId: string): Promise<DigitalSignatureEntity[]>
     {
         try
         {
-            return this.prisma.digitalSignature.findMany({
+            const result = await this.prisma.digitalSignature.findMany({
                 where: {userId, deletedAt: null},
                 orderBy: [{isDefault: 'desc'}, {createdAt: 'desc'}],
             });
+
+            this.logger.log(`findAll → success userId=${userId}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findAll → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -29,11 +35,14 @@ export class SignatureService
     {
         try
         {
-            return this.findUserSignature(userId, id);
+            const result = await this.findUserSignature(userId, id);
+            this.logger.log(`findOne → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findOne → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -45,13 +54,17 @@ export class SignatureService
             if (dto.isDefault)
                 await this.clearDefault(userId);
 
-            return this.prisma.digitalSignature.create({
+            const result = await this.prisma.digitalSignature.create({
                 data: {...dto, userId},
             });
+
+            this.logger.log(`create → success userId=${userId}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`create → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -65,14 +78,18 @@ export class SignatureService
             if (dto.isDefault)
                 await this.clearDefault(userId);
 
-            return this.prisma.digitalSignature.update({
+            const result = await this.prisma.digitalSignature.update({
                 where: {id},
                 data: dto,
             });
+
+            this.logger.log(`update → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`update → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -91,11 +108,13 @@ export class SignatureService
             if (signature.isDefault)
                 await this.assignNextDefault(userId);
 
+            this.logger.log(`remove → success id=${id}`);
             return {message: 'Firma eliminada correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`remove → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -107,14 +126,18 @@ export class SignatureService
             await this.findUserSignature(userId, id);
             await this.clearDefault(userId);
 
-            return this.prisma.digitalSignature.update({
+            const result = await this.prisma.digitalSignature.update({
                 where: {id},
                 data: {isDefault: true},
             });
+
+            this.logger.log(`setDefault → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`setDefault → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

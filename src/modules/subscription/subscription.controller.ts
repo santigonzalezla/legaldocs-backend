@@ -62,6 +62,15 @@ export class SubscriptionController
         return this.subscriptionService.cancel(user.userId, firmId);
     }
 
+    // ─── USAGE ────────────────────────────────────────────────────────────────────
+
+    @Get('me/usage')
+    @ApiOperation({summary: 'Uso actual del despacho (documentos, usuarios, plantillas)'})
+    async getUsage(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined)
+    {
+        return this.subscriptionService.getUsage(user.userId, firmId);
+    }
+
     // ─── INVOICES ─────────────────────────────────────────────────────────────────
 
     @Get('me/invoices')

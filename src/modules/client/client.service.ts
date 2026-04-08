@@ -1,4 +1,4 @@
-import {HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {CreateClientDto} from './dto/create-client.dto';
@@ -10,6 +10,8 @@ import {Paginated} from '../../interfaces/Paginated';
 @Injectable()
 export class ClientService
 {
+    private readonly logger = new Logger(ClientService.name);
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly firmService: FirmService,
@@ -21,17 +23,21 @@ export class ClientService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            return this.prisma.client.create({
+            const result = await this.prisma.client.create({
                 data: {
                     ...dto,
                     firmId:    firm.id,
                     createdBy: userId,
                 },
             });
+
+            this.logger.log(`create → success firmId=${firm.id} id=${result.id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`create → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -65,11 +71,13 @@ export class ClientService
                 this.prisma.client.count({where}),
             ]);
 
+            this.logger.log(`findAll → success firmId=${firm.id} total=${total}`);
             return {data, total, page, limit};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findAll → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -78,11 +86,14 @@ export class ClientService
     {
         try
         {
-            return this.findFirmClient(userId, firmId, id);
+            const result = await this.findFirmClient(userId, firmId, id);
+            this.logger.log(`findOne → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findOne → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -93,11 +104,14 @@ export class ClientService
         {
             await this.findFirmClient(userId, firmId, id);
 
-            return this.prisma.client.update({where: {id}, data: dto});
+            const result = await this.prisma.client.update({where: {id}, data: dto});
+            this.logger.log(`update → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`update → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -113,11 +127,13 @@ export class ClientService
 
             await this.prisma.client.update({where: {id}, data: {deletedAt: new Date()}});
 
+            this.logger.log(`remove → success id=${id}`);
             return {message: 'Cliente eliminado correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`remove → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -131,11 +147,14 @@ export class ClientService
             if (!client.deletedAt)
                 throw new HttpException('El cliente no está eliminado', 400);
 
-            return this.prisma.client.update({where: {id}, data: {deletedAt: null}});
+            const result = await this.prisma.client.update({where: {id}, data: {deletedAt: null}});
+            this.logger.log(`restore → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`restore → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

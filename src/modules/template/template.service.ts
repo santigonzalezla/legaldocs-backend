@@ -1,5 +1,5 @@
 import * as mammoth from 'mammoth';
-import {BadRequestException, ForbiddenException, HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {BadRequestException, ForbiddenException, HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {CreateTemplateDto} from './dto/create-template.dto';
@@ -11,6 +11,8 @@ import {TemplateOrigin} from '../../../generated/prisma/client';
 @Injectable()
 export class TemplateService
 {
+    private readonly logger = new Logger(TemplateService.name);
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly firmService: FirmService,
@@ -52,11 +54,13 @@ export class TemplateService
                 this.prisma.documentTemplate.count({where}),
             ]);
 
+            this.logger.log(`findAll → success firmId=${firm.id} total=${total}`);
             return {data, total, page, limit};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findAll → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -65,11 +69,14 @@ export class TemplateService
     {
         try
         {
-            return this.findAccessibleTemplate(userId, firmId, id);
+            const result = await this.findAccessibleTemplate(userId, firmId, id);
+            this.logger.log(`findOne → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`findOne → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -80,7 +87,7 @@ export class TemplateService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            return this.prisma.documentTemplate.create({
+            const result = await this.prisma.documentTemplate.create({
                 data: {
                     ...dto,
                     firmId: firm.id,
@@ -88,10 +95,14 @@ export class TemplateService
                     origin: TemplateOrigin.FIRM_CUSTOM,
                 },
             });
+
+            this.logger.log(`create → success firmId=${firm.id} id=${result.id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`create → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -102,14 +113,18 @@ export class TemplateService
         {
             await this.findFirmTemplate(userId, firmId, id);
 
-            return this.prisma.documentTemplate.update({
+            const result = await this.prisma.documentTemplate.update({
                 where: {id},
                 data: dto,
             });
+
+            this.logger.log(`update → success id=${id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`update → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -125,11 +140,13 @@ export class TemplateService
                 data: {deletedAt: new Date()},
             });
 
+            this.logger.log(`remove → success id=${id}`);
             return {message: 'Plantilla eliminada correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`remove → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -143,7 +160,7 @@ export class TemplateService
 
             const {id: _, numId: __, createdAt: ___, updatedAt: ____, deletedAt: _____, ...data} = original;
 
-            return this.prisma.documentTemplate.create({
+            const result = await this.prisma.documentTemplate.create({
                 data: {
                     ...data,
                     firmId: firm.id,
@@ -153,10 +170,14 @@ export class TemplateService
                     version: '1.0',
                 },
             });
+
+            this.logger.log(`copyTemplate → success sourceId=${id} newId=${result.id}`);
+            return result;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`copyTemplate → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -176,6 +197,7 @@ export class TemplateService
                 await this.prisma.templateFavorite.delete({
                     where: {templateId_userId: {templateId: id, userId}},
                 });
+                this.logger.log(`toggleFavorite → removed id=${id} userId=${userId}`);
                 return {isFavorite: false};
             }
 
@@ -183,11 +205,13 @@ export class TemplateService
                 data: {templateId: id, userId},
             });
 
+            this.logger.log(`toggleFavorite → added id=${id} userId=${userId}`);
             return {isFavorite: true};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`toggleFavorite → failed id=${id}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -251,12 +275,13 @@ export class TemplateService
                 }
             }
 
+            this.logger.log(`parseUpload → success userId=${userId} vars=${detected.length}`);
             return {textTemplate, variableFields, detectedVariables: detected};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
-            console.error('[parseUpload]', error);
+            this.logger.error(`parseUpload → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error al procesar el archivo');
         }
     }

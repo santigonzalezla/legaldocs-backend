@@ -2,7 +2,7 @@ import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import {Request} from 'express';
 import {JwtService} from '@nestjs/jwt';
-import {BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, UnauthorizedException} from '@nestjs/common';
+import {BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, Logger, UnauthorizedException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {MailService} from '../../utils/mail/mail.service';
 import {environmentVariables} from '../../config';
@@ -21,6 +21,8 @@ export interface AuthTokens {
 @Injectable()
 export class AuthService
 {
+    private readonly logger = new Logger(AuthService.name);
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly jwtService: JwtService,
@@ -68,11 +70,14 @@ export class AuthService
 
             this.mailService.sendVerificationEmail(user.email, user.firstName, emailVerifyToken).catch(() => {});
 
-            return this.generateTokens(user.credentials!.id, user.id, user.email, req);
+            const tokens = await this.generateTokens(user.credentials!.id, user.id, user.email, req);
+            this.logger.log(`register → success userId=${user.id}`);
+            return tokens;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`register → failed email=${dto.email}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -94,11 +99,13 @@ export class AuthService
                 data: {isEmailVerified: true, emailVerifyToken: null},
             });
 
+            this.logger.log(`verifyEmail → success credentialsId=${credentials.id}`);
             return {message: 'Correo verificado correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`verifyEmail → failed`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -129,11 +136,14 @@ export class AuthService
                 data: {lastLoginAt: new Date()},
             });
 
-            return this.generateTokens(credentials.id, credentials.userId, credentials.email, req);
+            const tokens = await this.generateTokens(credentials.id, credentials.userId, credentials.email, req);
+            this.logger.log(`login → success userId=${credentials.userId}`);
+            return tokens;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`login → failed email=${dto.email}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -164,11 +174,14 @@ export class AuthService
                 }
             }
 
-            return this.generateTokens(user.sub, user.userId, user.email, req);
+            const tokens = await this.generateTokens(user.sub, user.userId, user.email, req);
+            this.logger.log(`refreshTokens → success userId=${user.userId}`);
+            return tokens;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`refreshTokens → failed userId=${user.userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -195,11 +208,13 @@ export class AuthService
                 }
             }
 
+            this.logger.log(`logout → success userId=${user.userId}`);
             return {message: 'Sesión cerrada correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`logout → failed userId=${user.userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -228,11 +243,13 @@ export class AuthService
 
             this.mailService.sendPasswordResetEmail(credentials.email, credentials.user.firstName, resetToken).catch(() => {});
 
+            this.logger.log(`requestPasswordReset → success email=${dto.email}`);
             return {message: 'Si el correo existe, recibirás un enlace de recuperación'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`requestPasswordReset → failed email=${dto.email}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -259,11 +276,13 @@ export class AuthService
                 data: {password: hashedPassword, resetToken: null, resetTokenExpiry: null},
             });
 
+            this.logger.log(`resetPassword → success credentialsId=${credentials.id}`);
             return {message: 'Contraseña restablecida correctamente'};
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`resetPassword → failed`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
@@ -329,11 +348,14 @@ export class AuthService
                 data: {lastLoginAt: new Date()},
             });
 
-            return this.generateTokens(credentials!.id, credentials!.userId, credentials!.email, req);
+            const tokens = await this.generateTokens(credentials!.id, credentials!.userId, credentials!.email, req);
+            this.logger.log(`handleOAuthLogin → success userId=${credentials!.userId} provider=${profile.provider}`);
+            return tokens;
         }
         catch (error)
         {
             if (error instanceof HttpException) throw error;
+            this.logger.error(`handleOAuthLogin → failed email=${profile.email}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
