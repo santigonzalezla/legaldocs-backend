@@ -13,6 +13,7 @@ export class UserEntity implements User
     country: string | null;
     birthDate: Date | null;
     bio: string | null;
+    hourlyRate: number | null;
     avatarUrl: string | null;
     cloudPublicId: string | null;
     lastLoginAt: Date | null;

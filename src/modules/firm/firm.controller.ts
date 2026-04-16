@@ -26,6 +26,22 @@ export class FirmController
         return this.firmService.getMyFirms(user.userId);
     }
 
+    @Get('my-invitations')
+    @ApiOperation({summary: 'Listar invitaciones pendientes para el usuario autenticado'})
+    async getMyInvitations(@CurrentUser() user: LoggedUser)
+    {
+        return this.firmService.getMyInvitations(user.userId);
+    }
+
+    @Post('my-invitations/reject')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({summary: 'Rechazar invitación a un despacho'})
+    @ApiQuery({name: 'token', required: true, description: 'Token de invitación'})
+    async rejectInvitation(@CurrentUser() user: LoggedUser, @Query('token') token: string)
+    {
+        return this.firmService.rejectInvitation(user.userId, token);
+    }
+
     @Post()
     @ApiOperation({summary: 'Crear despacho para el usuario autenticado'})
     async createFirm(@CurrentUser() user: LoggedUser, @Body() dto: CreateFirmDto)

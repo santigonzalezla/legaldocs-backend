@@ -1,5 +1,5 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {IsDateString, IsOptional, IsString, MaxLength} from 'class-validator';
+import {IsDateString, IsNumber, IsOptional, IsString, MaxLength, Min} from 'class-validator';
 
 export class UpdateProfileDto
 {
@@ -75,4 +75,14 @@ export class UpdateProfileDto
         required: false
     })
     bio?: string;
+
+    @IsNumber()
+    @Min(0)
+    @IsOptional()
+    @ApiProperty({
+        description: 'Tarifa por hora en pesos colombianos',
+        example: 150000,
+        required: false
+    })
+    hourlyRate?: number;
 }

@@ -1,5 +1,12 @@
 import * as crypto from 'crypto';
-import {BadRequestException, ForbiddenException, HttpException, Injectable, InternalServerErrorException, NotFoundException} from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    HttpException,
+    Injectable,
+    InternalServerErrorException,
+    NotFoundException
+} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {MailService} from '../../utils/mail/mail.service';
 import {CreateFirmDto} from './dto/create-firm.dto';
@@ -16,34 +23,92 @@ import {Prisma} from '../../../generated/prisma/client';
 @Injectable()
 export class FirmService
 {
-    constructor(
-        private readonly prisma: PrismaService,
-        private readonly mailService: MailService,
-    ) {}
+    constructor(private readonly prisma: PrismaService, private readonly mailService: MailService) {}
 
-    async getMyFirms(userId: string): Promise<Array<FirmEntity & {role: FirmMemberRole; isOwner: boolean}>>
+    async getMyFirms(userId: string): Promise<Array<FirmEntity & { role: FirmMemberRole; isOwner: boolean }>>
     {
-        try
-        {
+        try {
             const ownedFirms = await this.prisma.firm.findMany({
-                where: {createdBy: userId, deletedAt: null},
+                where: {createdBy: userId, deletedAt: null}
             });
 
-            const ownedIds   = new Set(ownedFirms.map(f => f.id));
+            const ownedIds = new Set(ownedFirms.map(f => f.id));
             const memberships = await this.prisma.firmMember.findMany({
                 where: {userId, status: FirmMemberStatus.ACTIVE},
-                include: {firm: true},
+                include: {firm: true}
             });
 
             return [
                 ...ownedFirms.map(f => ({...f, role: FirmMemberRole.ADMIN, isOwner: true})),
                 ...memberships
                     .filter(m => !ownedIds.has(m.firmId) && !m.firm.deletedAt)
-                    .map(m => ({...m.firm, role: m.role, isOwner: false})),
+                    .map(m => ({...m.firm, role: m.role, isOwner: false}))
             ];
+        } catch (error) {
+            if (error instanceof HttpException) throw error;
+            throw new InternalServerErrorException('Error interno del servidor');
         }
-        catch (error)
-        {
+    }
+
+    async getMyInvitations(userId: string): Promise<Array<{
+        id: string; role: FirmMemberRole; inviteToken: string;
+        inviteExpiresAt: Date; createdAt: Date;
+        firm: { id: string; name: string; legalName: string | null; city: string | null };
+    }>>
+    {
+        try {
+            const user = await this.prisma.user.findUnique({where: {id: userId}});
+            if (!user) return [];
+
+            const invitations = await this.prisma.firmMember.findMany({
+                where: {
+                    inviteEmail: user.email,
+                    status: FirmMemberStatus.PENDING,
+                    inviteExpiresAt: {gte: new Date()},
+                    inviteToken: {not: null}
+                },
+                include: {firm: {select: {id: true, name: true, legalName: true, city: true}}},
+                orderBy: {createdAt: 'desc'}
+            });
+
+            return invitations
+                .filter(i => i.inviteToken !== null)
+                .map(i => ({
+                    id: i.id,
+                    role: i.role,
+                    inviteToken: i.inviteToken!,
+                    inviteExpiresAt: i.inviteExpiresAt!,
+                    createdAt: i.createdAt,
+                    firm: i.firm
+                }));
+        } catch (error) {
+            if (error instanceof HttpException) throw error;
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async rejectInvitation(userId: string, token: string): Promise<{ message: string }>
+    {
+        try {
+            const user = await this.prisma.user.findUnique({where: {id: userId}});
+
+            const member = await this.prisma.firmMember.findFirst({
+                where: {
+                    inviteToken: token,
+                    status: FirmMemberStatus.PENDING,
+                    inviteExpiresAt: {gte: new Date()}
+                }
+            });
+
+            if (!member) throw new BadRequestException('Invitación inválida o expirada');
+
+            if (member.inviteEmail && user?.email !== member.inviteEmail)
+                throw new ForbiddenException('Esta invitación no corresponde a tu cuenta');
+
+            await this.prisma.firmMember.delete({where: {id: member.id}});
+
+            return {message: 'Invitación rechazada'};
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
@@ -51,16 +116,15 @@ export class FirmService
 
     async createFirm(userId: string, dto: CreateFirmDto): Promise<FirmEntity>
     {
-        try
-        {
+        try {
             const existing = await this.prisma.firm.findFirst({
-                where: {createdBy: userId, deletedAt: null},
+                where: {createdBy: userId, deletedAt: null}
             });
 
             if (existing) throw new BadRequestException('Ya tienes un despacho registrado');
 
             const basicPlan = await this.prisma.subscriptionPlan.findFirst({
-                where: {name: 'basic', isActive: true},
+                where: {name: 'basic', isActive: true}
             });
 
             const firm = await this.prisma.firm.create({
@@ -72,30 +136,27 @@ export class FirmService
                             userId,
                             role: FirmMemberRole.ADMIN,
                             status: FirmMemberStatus.ACTIVE,
-                            joinedAt: new Date(),
-                        },
-                    },
-                },
+                            joinedAt: new Date()
+                        }
+                    }
+                }
             });
 
-            if (basicPlan)
-            {
+            if (basicPlan) {
                 await this.prisma.subscription.create({
                     data: {
-                        firmId:      firm.id,
-                        planId:      basicPlan.id,
+                        firmId: firm.id,
+                        planId: basicPlan.id,
                         billingCycle: 'MONTHLY',
-                        status:      'TRIAL',
-                        startDate:   new Date(),
-                        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-                    },
+                        status: 'TRIAL',
+                        startDate: new Date(),
+                        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+                    }
                 });
             }
 
             return firm;
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
@@ -103,12 +164,9 @@ export class FirmService
 
     async getMyFirm(userId: string, firmId?: string): Promise<FirmEntity>
     {
-        try
-        {
+        try {
             return this.findUserFirm(userId, firmId);
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
@@ -116,27 +174,23 @@ export class FirmService
 
     async updateFirm(userId: string, firmId: string | undefined, dto: UpdateFirmDto): Promise<FirmEntity>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
             await this.assertCanManage(firm, userId);
 
             return this.prisma.firm.update({
                 where: {id: firm.id},
-                data: dto,
+                data: dto
             });
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
 
-    async deleteFirm(userId: string, firmId?: string): Promise<{message: string}>
+    async deleteFirm(userId: string, firmId?: string): Promise<{ message: string }>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
 
             if (firm.createdBy !== userId)
@@ -144,13 +198,11 @@ export class FirmService
 
             await this.prisma.firm.update({
                 where: {id: firm.id},
-                data: {deletedAt: new Date()},
+                data: {deletedAt: new Date()}
             });
 
             return {message: 'Despacho eliminado correctamente'};
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
@@ -158,18 +210,15 @@ export class FirmService
 
     async getMembers(userId: string, firmId?: string): Promise<FirmMemberEntity[]>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
 
             return this.prisma.firmMember.findMany({
-                where:   {firmId: firm.id},
+                where: {firmId: firm.id},
                 include: {user: {select: {firstName: true, lastName: true, email: true, phone: true}}},
-                orderBy: {createdAt: 'asc'},
+                orderBy: {createdAt: 'asc'}
             });
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
@@ -177,18 +226,17 @@ export class FirmService
 
     async inviteMember(userId: string, firmId: string | undefined, dto: InviteMemberDto): Promise<FirmMemberEntity>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
             await this.assertCanManage(firm, userId);
 
             const existing = await this.prisma.firmMember.findFirst({
-                where: {firmId: firm.id, inviteEmail: dto.email, status: FirmMemberStatus.PENDING},
+                where: {firmId: firm.id, inviteEmail: dto.email, status: FirmMemberStatus.PENDING}
             });
 
             if (existing) throw new BadRequestException('Ya existe una invitación pendiente para ese correo en este despacho');
 
-            const inviteToken     = crypto.randomBytes(32).toString('hex');
+            const inviteToken = crypto.randomBytes(32).toString('hex');
             const inviteExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
             const member = await this.prisma.firmMember.create({
@@ -198,8 +246,8 @@ export class FirmService
                     status: FirmMemberStatus.PENDING,
                     inviteEmail: dto.email,
                     inviteToken,
-                    inviteExpiresAt,
-                },
+                    inviteExpiresAt
+                }
             });
 
             const inviter = await this.prisma.user.findUnique({where: {id: userId}});
@@ -208,28 +256,25 @@ export class FirmService
                 dto.email,
                 inviter ? `${inviter.firstName} ${inviter.lastName}` : 'Un miembro del despacho',
                 firm.name,
-                inviteToken,
+                inviteToken
             ).catch(() => {});
 
             return member;
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
 
-    async acceptInvitation(userId: string, token: string): Promise<{message: string}>
+    async acceptInvitation(userId: string, token: string): Promise<{ message: string }>
     {
-        try
-        {
+        try {
             const member = await this.prisma.firmMember.findFirst({
                 where: {
-                    inviteToken:    token,
-                    status:         FirmMemberStatus.PENDING,
-                    inviteExpiresAt: {gte: new Date()},
-                },
+                    inviteToken: token,
+                    status: FirmMemberStatus.PENDING,
+                    inviteExpiresAt: {gte: new Date()}
+                }
             });
 
             if (!member) throw new BadRequestException('Invitación inválida o expirada');
@@ -240,11 +285,10 @@ export class FirmService
                 throw new ForbiddenException('Esta invitación no corresponde a tu cuenta');
 
             const alreadyMember = await this.prisma.firmMember.findFirst({
-                where: {firmId: member.firmId, userId, status: FirmMemberStatus.ACTIVE},
+                where: {firmId: member.firmId, userId, status: FirmMemberStatus.ACTIVE}
             });
 
-            if (alreadyMember)
-            {
+            if (alreadyMember) {
                 await this.prisma.firmMember.delete({where: {id: member.id}});
                 throw new BadRequestException('Ya eres miembro activo de este despacho');
             }
@@ -253,17 +297,15 @@ export class FirmService
                 where: {id: member.id},
                 data: {
                     userId,
-                    status:          FirmMemberStatus.ACTIVE,
-                    joinedAt:        new Date(),
-                    inviteToken:     null,
-                    inviteExpiresAt: null,
-                },
+                    status: FirmMemberStatus.ACTIVE,
+                    joinedAt: new Date(),
+                    inviteToken: null,
+                    inviteExpiresAt: null
+                }
             });
 
             return {message: 'Te uniste al despacho correctamente'};
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             if (error instanceof Prisma.PrismaClientKnownRequestError) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
@@ -272,13 +314,12 @@ export class FirmService
 
     async updateMember(userId: string, firmId: string | undefined, memberId: string, dto: UpdateMemberDto): Promise<FirmMemberEntity>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
             await this.assertCanManage(firm, userId);
 
             const member = await this.prisma.firmMember.findFirst({
-                where: {id: memberId, firmId: firm.id},
+                where: {id: memberId, firmId: firm.id}
             });
 
             if (!member) throw new NotFoundException('Miembro no encontrado');
@@ -288,25 +329,22 @@ export class FirmService
 
             return this.prisma.firmMember.update({
                 where: {id: memberId},
-                data: dto,
+                data: dto
             });
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
 
-    async removeMember(userId: string, firmId: string | undefined, memberId: string): Promise<{message: string}>
+    async removeMember(userId: string, firmId: string | undefined, memberId: string): Promise<{ message: string }>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
             await this.assertCanManage(firm, userId);
 
             const member = await this.prisma.firmMember.findFirst({
-                where: {id: memberId, firmId: firm.id},
+                where: {id: memberId, firmId: firm.id}
             });
 
             if (!member) throw new NotFoundException('Miembro no encontrado');
@@ -317,9 +355,7 @@ export class FirmService
             await this.prisma.firmMember.delete({where: {id: memberId}});
 
             return {message: 'Miembro eliminado correctamente'};
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
@@ -327,17 +363,14 @@ export class FirmService
 
     async getSpecialties(userId: string, firmId?: string): Promise<FirmSpecialtyEntity[]>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
 
             return this.prisma.firmSpecialty.findMany({
                 where: {firmId: firm.id},
-                orderBy: {specialty: 'asc'},
+                orderBy: {specialty: 'asc'}
             });
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
@@ -345,37 +378,33 @@ export class FirmService
 
     async addSpecialty(userId: string, firmId: string | undefined, dto: AddSpecialtyDto): Promise<FirmSpecialtyEntity>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
             await this.assertCanManage(firm, userId);
 
             const existing = await this.prisma.firmSpecialty.findFirst({
-                where: {firmId: firm.id, specialty: dto.specialty},
+                where: {firmId: firm.id, specialty: dto.specialty}
             });
 
             if (existing) throw new BadRequestException('El despacho ya tiene esa especialidad registrada');
 
             return this.prisma.firmSpecialty.create({
-                data: {firmId: firm.id, specialty: dto.specialty},
+                data: {firmId: firm.id, specialty: dto.specialty}
             });
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
 
-    async removeSpecialty(userId: string, firmId: string | undefined, specialtyId: string): Promise<{message: string}>
+    async removeSpecialty(userId: string, firmId: string | undefined, specialtyId: string): Promise<{ message: string }>
     {
-        try
-        {
+        try {
             const firm = await this.findUserFirm(userId, firmId);
             await this.assertCanManage(firm, userId);
 
             const specialty = await this.prisma.firmSpecialty.findFirst({
-                where: {id: specialtyId, firmId: firm.id},
+                where: {id: specialtyId, firmId: firm.id}
             });
 
             if (!specialty) throw new NotFoundException('Especialidad no encontrada');
@@ -383,9 +412,7 @@ export class FirmService
             await this.prisma.firmSpecialty.delete({where: {id: specialtyId}});
 
             return {message: 'Especialidad eliminada correctamente'};
-        }
-        catch (error)
-        {
+        } catch (error) {
             if (error instanceof HttpException) throw error;
             throw new InternalServerErrorException('Error interno del servidor');
         }
@@ -393,10 +420,9 @@ export class FirmService
 
     private async findUserFirm(userId: string, firmId?: string): Promise<Firm>
     {
-        if (firmId)
-        {
+        if (firmId) {
             const firm = await this.prisma.firm.findFirst({
-                where: {id: firmId, deletedAt: null},
+                where: {id: firmId, deletedAt: null}
             });
 
             if (!firm) throw new NotFoundException('Firma no encontrada');
@@ -404,7 +430,7 @@ export class FirmService
             if (firm.createdBy === userId) return firm;
 
             const membership = await this.prisma.firmMember.findFirst({
-                where: {firmId, userId, status: FirmMemberStatus.ACTIVE},
+                where: {firmId, userId, status: FirmMemberStatus.ACTIVE}
             });
 
             if (!membership) throw new ForbiddenException('No tienes acceso a esta firma');
@@ -413,7 +439,7 @@ export class FirmService
         }
 
         const owned = await this.prisma.firm.findFirst({
-            where: {createdBy: userId, deletedAt: null},
+            where: {createdBy: userId, deletedAt: null}
         });
 
         if (owned) return owned;
@@ -421,7 +447,7 @@ export class FirmService
         const membership = await this.prisma.firmMember.findFirst({
             where: {userId, status: FirmMemberStatus.ACTIVE},
             include: {firm: true},
-            orderBy: {joinedAt: 'asc'},
+            orderBy: {joinedAt: 'asc'}
         });
 
         if (!membership || membership.firm.deletedAt)
@@ -435,7 +461,7 @@ export class FirmService
         if (firm.createdBy === userId) return;
 
         const member = await this.prisma.firmMember.findFirst({
-            where: {firmId: firm.id, userId, status: FirmMemberStatus.ACTIVE, role: FirmMemberRole.ADMIN},
+            where: {firmId: firm.id, userId, status: FirmMemberStatus.ACTIVE, role: FirmMemberRole.ADMIN}
         });
 
         if (!member) throw new ForbiddenException('No tienes permisos para gestionar este despacho');

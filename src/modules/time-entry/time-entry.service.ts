@@ -86,7 +86,8 @@ export class TimeEntryService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            const now = new Date();
+            const startedAt = dto.startedAt ?? new Date();
+            const endedAt   = new Date(startedAt.getTime() + dto.durationMinutes * 60_000);
             const result = await this.prisma.timeEntry.create({
                 data: {
                     processId:       dto.processId,
@@ -94,8 +95,8 @@ export class TimeEntryService
                     firmId:          firm.id,
                     type:            'MANUAL',
                     description:     dto.description,
-                    startedAt:       now,
-                    endedAt:         now,
+                    startedAt,
+                    endedAt,
                     durationMinutes: dto.durationMinutes,
                 },
             });
@@ -117,13 +118,15 @@ export class TimeEntryService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
+            const where = processId ? {processId, firmId: firm.id} : {firmId: firm.id};
+
             const result = await this.prisma.timeEntry.findMany({
-                where:   {processId, firmId: firm.id},
-                include: {user: {select: {firstName: true, lastName: true}}},
+                where,
+                include: {user: {select: {firstName: true, lastName: true, hourlyRate: true}}},
                 orderBy: {startedAt: 'desc'},
             }) as unknown as TimeEntryWithUserEntity[];
 
-            this.logger.log(`findByProcess → success processId=${processId} count=${result.length}`);
+            this.logger.log(`findByProcess → success processId=${processId || 'ALL'} count=${result.length}`);
             return result;
         }
         catch (error)

@@ -18,5 +18,5 @@ export class TimeEntryEntity implements TimeEntry
 
 export class TimeEntryWithUserEntity extends TimeEntryEntity
 {
-    user: {firstName: string; lastName: string};
+    user: {firstName: string; lastName: string; hourlyRate: number | null};
 }

@@ -142,6 +142,7 @@ model User {
     country       String?   @default("Colombia") @map("STR_COUNTRY_USER")
     birthDate     DateTime? @map("DTM_BIRTH_DATE_USER")
     bio           String?   @map("STR_BIO_USER")
+    hourlyRate    Float?    @map("DEC_HOURLY_RATE_USER")
     avatarUrl     String?   @map("STR_AVATAR_URL_USER")
     cloudPublicId String?   @map("STR_CLOUD_PUBLIC_ID_USER")
     lastLoginAt   DateTime? @map("DTM_LAST_LOGIN_AT_USER")
