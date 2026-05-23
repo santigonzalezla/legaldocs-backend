@@ -1,5 +1,5 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {IsBoolean, IsOptional, IsString, IsUUID} from 'class-validator';
+import {IsArray, IsBoolean, IsOptional, IsString, IsUUID} from 'class-validator';
 
 export class CreateTemplateDto
 {
@@ -19,13 +19,14 @@ export class CreateTemplateDto
     })
     title: string;
 
-    @IsUUID()
+    @IsArray()
+    @IsUUID('4', {each: true})
     @ApiProperty({
-        description: 'ID de la rama jurídica a la que pertenece',
-        example: 'uuid-v4',
+        description: 'IDs de las ramas jurídicas a las que pertenece',
+        example: ['uuid-v4'],
         required: true,
     })
-    branchId: string;
+    branchIds: string[];
 
     @IsString()
     @IsOptional()

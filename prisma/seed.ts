@@ -32,23 +32,29 @@ async function main()
     }
 
     // ─── Subscription Plans ───────────────────────────────────────────────────────
+    // Límites de tokens calibrados para GPT-4.1 (~10.000 tokens por request promedio).
+    // AI cost % sobre ingreso del plan es consistente en ~15% en los tres planes:
+    //   Básico      ($99.000 COP = ~$24 USD):  ~150 req/mes  → $4 USD AI   → 16.8%
+    //   Business    ($549.000 COP = ~$134 USD): ~700 req/mes  → $19 USD AI  → 14.1%
+    //   Empresarial ($899.000 COP = ~$219 USD): ~1.200 req/mes → $32 USD AI → 14.8%
     const plans = [
         {
             name:               'basic',
             displayName:        'Básico',
             description:        'Para abogados que están comenzando su práctica digital.',
-            priceMonthly:       49900,
-            priceAnnually:      39920,
+            priceMonthly:       99000,
+            priceAnnually:      79200,
             maxDocuments:       20,
             maxUsers:           1,
             maxTemplates:       5,
-            maxAiTokensDaily:   19000,
-            maxAiTokensWeekly:  94000,
-            maxAiTokensMonthly: 300000,
+            maxAiTokensDaily:   100000,
+            maxAiTokensWeekly:  400000,
+            maxAiTokensMonthly: 1500000,
             features: [
                 '20 documentos por mes',
                 '1 usuario',
                 '5 plantillas personalizadas',
+                'Asistente Legalito IA',
                 'Exportación PDF y DOCX',
                 'Soporte por email',
             ],
@@ -59,14 +65,14 @@ async function main()
             name:               'business',
             displayName:        'Business',
             description:        'Para despachos en crecimiento que necesitan más potencia.',
-            priceMonthly:       249900,
-            priceAnnually:      199920,
+            priceMonthly:       549000,
+            priceAnnually:      439200,
             maxDocuments:       100,
             maxUsers:           5,
             maxTemplates:       20,
-            maxAiTokensDaily:   75000,
-            maxAiTokensWeekly:  375000,
-            maxAiTokensMonthly: 1300000,
+            maxAiTokensDaily:   400000,
+            maxAiTokensWeekly:  1800000,
+            maxAiTokensMonthly: 7000000,
             features: [
                 '100 documentos por mes',
                 '5 usuarios',
@@ -83,14 +89,14 @@ async function main()
             name:               'empresarial',
             displayName:        'Empresarial',
             description:        'Para firmas establecidas con equipos grandes y alto volumen.',
-            priceMonthly:       799900,
-            priceAnnually:      639920,
+            priceMonthly:       899000,
+            priceAnnually:      719200,
             maxDocuments:       500,
             maxUsers:           25,
             maxTemplates:       100,
-            maxAiTokensDaily:   280000,
-            maxAiTokensWeekly:  1500000,
-            maxAiTokensMonthly: 5600000,
+            maxAiTokensDaily:   600000,
+            maxAiTokensWeekly:  3000000,
+            maxAiTokensMonthly: 12000000,
             features: [
                 '500 documentos por mes',
                 '25 usuarios',

@@ -1,4 +1,4 @@
-import {DocumentTemplate, TemplateOrigin} from '../../../../generated/prisma/client';
+import {DocumentTemplate, LegalBranch, TemplateOrigin} from '../../../../generated/prisma/client';
 
 export class DocumentTemplateEntity implements DocumentTemplate
 {
@@ -7,7 +7,6 @@ export class DocumentTemplateEntity implements DocumentTemplate
     documentType: string;
     version: string;
     title: string;
-    branchId: string;
     subcategory: string | null;
     applicableRegulations: any;
     requiresRegistration: boolean;
@@ -22,4 +21,6 @@ export class DocumentTemplateEntity implements DocumentTemplate
     deletedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
+
+    branches?: LegalBranch[];
 }

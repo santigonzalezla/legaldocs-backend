@@ -35,7 +35,7 @@ export class TemplateService
                     {origin: TemplateOrigin.SYSTEM},
                     {firmId: firm.id},
                 ],
-                ...(filters.branchId    && {branchId:     filters.branchId}),
+                ...(filters.branchId    && {branches: {some: {id: filters.branchId}}}),
                 ...(filters.documentType && {documentType: filters.documentType}),
                 ...(filters.origin      && {origin:       filters.origin}),
                 ...(filters.isActive !== undefined && {isActive: filters.isActive}),
@@ -50,6 +50,7 @@ export class TemplateService
                     orderBy: {title: 'asc'},
                     skip,
                     take: limit,
+                    include: {branches: true},
                 }),
                 this.prisma.documentTemplate.count({where}),
             ]);
@@ -86,14 +87,17 @@ export class TemplateService
         try
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
+            const {branchIds, ...rest} = dto;
 
             const result = await this.prisma.documentTemplate.create({
                 data: {
-                    ...dto,
-                    firmId: firm.id,
+                    ...rest,
+                    firmId:    firm.id,
                     createdBy: userId,
-                    origin: TemplateOrigin.FIRM_CUSTOM,
+                    origin:    TemplateOrigin.FIRM_CUSTOM,
+                    branches:  {connect: branchIds.map(id => ({id}))},
                 },
+                include: {branches: true},
             });
 
             this.logger.log(`create → success firmId=${firm.id} id=${result.id}`);
@@ -112,10 +116,15 @@ export class TemplateService
         try
         {
             await this.findFirmTemplate(userId, firmId, id);
+            const {branchIds, ...rest} = dto;
 
             const result = await this.prisma.documentTemplate.update({
                 where: {id},
-                data: dto,
+                data: {
+                    ...rest,
+                    ...(branchIds && {branches: {set: branchIds.map(bid => ({id: bid}))}}),
+                },
+                include: {branches: true},
             });
 
             this.logger.log(`update → success id=${id}`);
@@ -158,17 +167,19 @@ export class TemplateService
             const firm     = await this.firmService.getMyFirm(userId, firmId);
             const original = await this.findAccessibleTemplate(userId, firmId, id);
 
-            const {id: _, numId: __, createdAt: ___, updatedAt: ____, deletedAt: _____, ...data} = original;
+            const {id: _, numId: __, createdAt: ___, updatedAt: ____, deletedAt: _____, branches: srcBranches, ...data} = original as any;
 
             const result = await this.prisma.documentTemplate.create({
                 data: {
                     ...data,
-                    firmId: firm.id,
-                    createdBy: userId,
-                    origin: TemplateOrigin.FIRM_COPY,
+                    firmId:           firm.id,
+                    createdBy:        userId,
+                    origin:           TemplateOrigin.FIRM_COPY,
                     parentTemplateId: id,
-                    version: '1.0',
+                    version:          '1.0',
+                    branches:         {connect: (srcBranches ?? []).map((b: any) => ({id: b.id}))},
                 },
+                include: {branches: true},
             });
 
             this.logger.log(`copyTemplate → success sourceId=${id} newId=${result.id}`);
@@ -300,6 +311,7 @@ export class TemplateService
                     {firmId: firm.id},
                 ],
             },
+            include: {branches: true},
         });
 
         if (!template) throw new NotFoundException('Plantilla no encontrada');

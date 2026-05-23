@@ -332,7 +332,7 @@ model LegalBranch {
     updatedAt   DateTime  @updatedAt @map("DTM_UPDATED_AT")
 
     firm             Firm?              @relation(fields: [firmId], references: [id], onDelete: Cascade)
-    templates        DocumentTemplate[]
+    templates        DocumentTemplate[] @relation("TemplateBranches")
     documents        Document[]
     legalProcesses   LegalProcess[]
     libraryDocuments LibraryDocument[]
@@ -350,7 +350,6 @@ model DocumentTemplate {
     documentType          String         @map("STR_DOCUMENT_TYPE_TEMPLATE")
     version               String         @default("1.0") @map("STR_VERSION_TEMPLATE")
     title                 String         @map("STR_TITLE_TEMPLATE")
-    branchId              String         @map("UID_LEGAL_BRANCH")
     subcategory           String?        @map("STR_SUBCATEGORY_TEMPLATE")
     applicableRegulations Json           @default("[]") @map("JSON_APPLICABLE_REGULATIONS_TEMPLATE")
     requiresRegistration  Boolean        @default(false) @map("BOOL_REQUIRES_REGISTRATION_TEMPLATE")
@@ -366,7 +365,7 @@ model DocumentTemplate {
     createdAt             DateTime       @default(now()) @map("DTM_CREATED_AT")
     updatedAt             DateTime       @updatedAt @map("DTM_UPDATED_AT")
 
-    branch                  LegalBranch              @relation(fields: [branchId], references: [id])
+    branches                LegalBranch[]            @relation("TemplateBranches")
     firm                    Firm?                    @relation(fields: [firmId], references: [id], onDelete: Cascade)
     parentTemplate          DocumentTemplate?        @relation("TemplateCopies", fields: [parentTemplateId], references: [id])
     copies                  DocumentTemplate[]       @relation("TemplateCopies")
@@ -375,7 +374,6 @@ model DocumentTemplate {
     processTemplates        ProcessTemplate[]
     clientFrequentTemplates ClientFrequentTemplate[]
 
-    @@index([branchId])
     @@index([firmId])
     @@index([documentType])
     @@index([origin])
