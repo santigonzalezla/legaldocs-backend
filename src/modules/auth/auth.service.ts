@@ -398,4 +398,10 @@ export class AuthService
 
         return {accessToken, refreshToken};
     }
+
+    async checkEmailExists(email: string): Promise<{exists: boolean}>
+    {
+        const credentials = await this.prisma.credentials.findUnique({where: {email}});
+        return {exists: !!credentials};
+    }
 }

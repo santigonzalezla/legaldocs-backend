@@ -86,6 +86,15 @@ export class AuthController
         return this.authService.verifyEmail(token);
     }
 
+    @Public()
+    @Get('check-email')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Verificar si un correo ya tiene cuenta registrada' })
+    async checkEmail(@Query('email') email: string)
+    {
+        return this.authService.checkEmailExists(email);
+    }
+
     // ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
 
     @Public()

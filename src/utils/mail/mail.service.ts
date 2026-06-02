@@ -45,7 +45,7 @@ export class MailService
 
     async sendFirmInvitationEmail(email: string, inviterName: string, firmName: string, token: string): Promise<void>
     {
-        const url = `${environmentVariables.frontendUrl}/invite?token=${token}`;
+        const url = `${environmentVariables.frontendUrl}/invite?token=${token}&email=${encodeURIComponent(email)}`;
 
         await this.send({
             to:      email,
