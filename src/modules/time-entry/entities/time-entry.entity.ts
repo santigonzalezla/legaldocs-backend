@@ -1,4 +1,4 @@
-import {TimeEntry, TimeEntryType} from '../../../../generated/prisma/client';
+import {BillableType, TimeEntry, TimeEntryType} from '../../../../generated/prisma/client';
 
 export class TimeEntryEntity implements TimeEntry
 {
@@ -8,6 +8,8 @@ export class TimeEntryEntity implements TimeEntry
     userId:          string;
     firmId:          string;
     type:            TimeEntryType;
+    billableType:    BillableType;
+    isShared:        boolean;
     description:     string | null;
     startedAt:       Date;
     endedAt:         Date | null;
@@ -18,5 +20,6 @@ export class TimeEntryEntity implements TimeEntry
 
 export class TimeEntryWithUserEntity extends TimeEntryEntity
 {
-    user: {firstName: string; lastName: string; hourlyRate: number | null};
+    user:         {firstName: string; lastName: string; hourlyRate: number | null};
+    participants: {id: string; userId: string; user: {firstName: string; lastName: string}}[];
 }

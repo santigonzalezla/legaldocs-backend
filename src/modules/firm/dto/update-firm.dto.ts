@@ -1,5 +1,5 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {IsEmail, IsOptional, IsString, IsUrl, MaxLength} from 'class-validator';
+import {IsEmail, IsNumber, IsOptional, IsPositive, IsString, IsUrl, MaxLength, Min} from 'class-validator';
 
 export class UpdateFirmDto
 {
@@ -93,4 +93,34 @@ export class UpdateFirmDto
         required: false,
     })
     description?: string;
+
+    @IsNumber()
+    @IsPositive()
+    @IsOptional()
+    @ApiProperty({
+        description: 'Tarifa por hora de la firma en COP (aplica a todos los procesos)',
+        example: 250000,
+        required: false,
+    })
+    firmHourlyRate?: number;
+
+    @IsNumber()
+    @Min(0)
+    @IsOptional()
+    @ApiProperty({
+        description: 'Meta diaria de horas facturables por abogado',
+        example: 5,
+        required: false,
+    })
+    dailyBillableGoalHours?: number;
+
+    @IsNumber()
+    @Min(0)
+    @IsOptional()
+    @ApiProperty({
+        description: 'Meta diaria de horas no facturables por abogado',
+        example: 2,
+        required: false,
+    })
+    dailyNonBillableGoalHours?: number;
 }

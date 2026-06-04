@@ -5,8 +5,10 @@ import {CreateProcessDto} from './dto/create-process.dto';
 import {UpdateProcessDto} from './dto/update-process.dto';
 import {ProcessFiltersDto} from './dto/process-filters.dto';
 import {AddProcessTemplateDto} from './dto/add-process-template.dto';
-import {LegalProcessEntity} from './entities/legal-process.entity';
+import {LegalProcessEntity, LegalProcessWithEntriesEntity} from './entities/legal-process.entity';
 import {ProcessTemplateEntity} from './entities/process-template.entity';
+import {ProcessValueEntryEntity} from './entities/process-value-entry.entity';
+import {CreateProcessValueEntryDto} from './dto/create-process-value-entry.dto';
 import {Paginated} from '../../interfaces/Paginated';
 
 @Injectable()
@@ -84,11 +86,25 @@ export class ProcessService
         }
     }
 
-    async findOne(userId: string, firmId?: string, id: string = ''): Promise<LegalProcessEntity>
+    async findOne(userId: string, firmId?: string, id: string = ''): Promise<LegalProcessWithEntriesEntity>
     {
         try
         {
-            const result = await this.findFirmProcess(userId, firmId, id);
+            const firm = await this.firmService.getMyFirm(userId, firmId);
+
+            const result = await this.prisma.legalProcess.findFirst({
+                where:   {id, firmId: firm.id, deletedAt: null},
+                include: {
+                    valueEntries: {
+                        where:   {deletedAt: null},
+                        select:  {id: true, amount: true, description: true, createdBy: true, createdAt: true},
+                        orderBy: {createdAt: 'asc'},
+                    },
+                },
+            }) as LegalProcessWithEntriesEntity | null;
+
+            if (!result) throw new NotFoundException('Proceso no encontrado');
+
             this.logger.log(`findOne → success id=${id}`);
             return result;
         }
@@ -240,6 +256,62 @@ export class ProcessService
         {
             if (error instanceof HttpException) throw error;
             this.logger.error(`removeTemplate → failed processId=${id}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async addValueEntry(userId: string, firmId?: string, processId: string = '', dto: CreateProcessValueEntryDto = {} as CreateProcessValueEntryDto): Promise<ProcessValueEntryEntity>
+    {
+        try
+        {
+            const firm = await this.firmService.getMyFirm(userId, firmId);
+            await this.findFirmProcess(userId, firmId, processId);
+
+            const result = await this.prisma.processValueEntry.create({
+                data: {
+                    processId,
+                    firmId:      firm.id,
+                    amount:      dto.amount,
+                    description: dto.description,
+                    createdBy:   userId,
+                },
+            });
+
+            this.logger.log(`addValueEntry → success processId=${processId} entryId=${result.id}`);
+            return result;
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`addValueEntry → failed processId=${processId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async removeValueEntry(userId: string, firmId?: string, processId: string = '', entryId: string = ''): Promise<{message: string}>
+    {
+        try
+        {
+            await this.findFirmProcess(userId, firmId, processId);
+
+            const entry = await this.prisma.processValueEntry.findFirst({
+                where: {id: entryId, processId, deletedAt: null},
+            });
+
+            if (!entry) throw new NotFoundException('Entrada de valor no encontrada');
+
+            await this.prisma.processValueEntry.update({
+                where: {id: entryId},
+                data:  {deletedAt: new Date()},
+            });
+
+            this.logger.log(`removeValueEntry → success processId=${processId} entryId=${entryId}`);
+            return {message: 'Entrada de valor eliminada correctamente'};
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`removeValueEntry → failed processId=${processId} entryId=${entryId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

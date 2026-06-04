@@ -117,6 +117,11 @@ enum TimeEntryType {
     MANUAL
 }
 
+enum BillableType {
+    BILLABLE
+    NON_BILLABLE
+}
+
 enum LibraryDocumentType {
     LAW
     DECREE
@@ -159,11 +164,13 @@ model User {
     templateFavorites TemplateFavorite[]
     documentFavorites DocumentFavorite[]
     logs              Log[]
-    createdClients    Client[]                 @relation("ClientCreator")
-    createdProcesses  LegalProcess[]           @relation("ProcessCreator")
-    assignedProcesses LegalProcess[]           @relation("ProcessAssignee")
-    timeEntries       TimeEntry[]
-    libraryDocuments  LibraryDocument[]
+    createdClients          Client[]                 @relation("ClientCreator")
+    createdProcesses        LegalProcess[]           @relation("ProcessCreator")
+    assignedProcesses       LegalProcess[]           @relation("ProcessAssignee")
+    timeEntries             TimeEntry[]
+    timeEntryParticipations TimeEntryParticipant[]   @relation("TimeEntryParticipations")
+    createdValueEntries     ProcessValueEntry[]      @relation("ProcessValueEntryCreator")
+    libraryDocuments        LibraryDocument[]
 
     @@index([deletedAt])
     @@map("USER")
@@ -257,9 +264,12 @@ model Firm {
     email         String?   @map("STR_EMAIL_FIRM")
     website       String?   @map("STR_WEBSITE_FIRM")
     description   String?   @map("STR_DESCRIPTION_FIRM")
-    logoUrl       String?   @map("STR_LOGO_URL_FIRM")
-    cloudPublicId String?   @map("STR_CLOUD_PUBLIC_ID_FIRM")
-    createdBy     String    @map("UID_CREATED_BY_FIRM")
+    logoUrl                   String?   @map("STR_LOGO_URL_FIRM")
+    cloudPublicId             String?   @map("STR_CLOUD_PUBLIC_ID_FIRM")
+    firmHourlyRate            Float?    @map("DEC_FIRM_HOURLY_RATE_FIRM")
+    dailyBillableGoalHours    Float?    @map("DEC_DAILY_BILLABLE_GOAL_HOURS_FIRM")
+    dailyNonBillableGoalHours Float?    @map("DEC_DAILY_NON_BILLABLE_GOAL_HOURS_FIRM")
+    createdBy                 String    @map("UID_CREATED_BY_FIRM")
     deletedAt     DateTime? @map("DTM_DELETED_AT_FIRM")
     createdAt     DateTime  @default(now()) @map("DTM_CREATED_AT")
     updatedAt     DateTime  @updatedAt @map("DTM_UPDATED_AT")
@@ -640,20 +650,22 @@ model LegalProcess {
     counterpart String?       @map("STR_COUNTERPART_LEGAL_PROCESS")
     startDate   DateTime?     @map("DTM_START_DATE_LEGAL_PROCESS")
     endDate     DateTime?     @map("DTM_END_DATE_LEGAL_PROCESS")
-    assignedTo  String?       @map("UID_ASSIGNED_TO_LEGAL_PROCESS")
-    createdBy   String        @map("UID_CREATED_BY_LEGAL_PROCESS")
-    deletedAt   DateTime?     @map("DTM_DELETED_AT_LEGAL_PROCESS")
-    createdAt   DateTime      @default(now()) @map("DTM_CREATED_AT")
-    updatedAt   DateTime      @updatedAt @map("DTM_UPDATED_AT")
+    assignedTo    String?       @map("UID_ASSIGNED_TO_LEGAL_PROCESS")
+    createdBy     String        @map("UID_CREATED_BY_LEGAL_PROCESS")
+    processValue  Float?        @map("DEC_PROCESS_VALUE_LEGAL_PROCESS")
+    deletedAt     DateTime?     @map("DTM_DELETED_AT_LEGAL_PROCESS")
+    createdAt     DateTime      @default(now()) @map("DTM_CREATED_AT")
+    updatedAt     DateTime      @updatedAt @map("DTM_UPDATED_AT")
 
-    firm        Firm              @relation(fields: [firmId], references: [id], onDelete: Cascade)
-    client      Client            @relation(fields: [clientId], references: [id])
-    branch      LegalBranch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
-    assignee    User?             @relation("ProcessAssignee", fields: [assignedTo], references: [id])
-    creator     User              @relation("ProcessCreator", fields: [createdBy], references: [id])
-    documents   Document[]
-    templates   ProcessTemplate[]
-    timeEntries TimeEntry[]
+    firm         Firm                @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    client       Client              @relation(fields: [clientId], references: [id])
+    branch       LegalBranch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+    assignee     User?               @relation("ProcessAssignee", fields: [assignedTo], references: [id])
+    creator      User                @relation("ProcessCreator", fields: [createdBy], references: [id])
+    documents    Document[]
+    templates    ProcessTemplate[]
+    timeEntries  TimeEntry[]
+    valueEntries ProcessValueEntry[]
 
     @@index([firmId])
     @@index([clientId])
@@ -702,6 +714,8 @@ model TimeEntry {
     userId          String        @map("UID_USER")
     firmId          String        @map("UID_FIRM")
     type            TimeEntryType @default(MANUAL) @map("STR_TYPE_TIME_ENTRY")
+    billableType    BillableType  @default(BILLABLE) @map("STR_BILLABLE_TYPE_TIME_ENTRY")
+    isShared        Boolean       @default(false) @map("BOOL_IS_SHARED_TIME_ENTRY")
     description     String?       @map("STR_DESCRIPTION_TIME_ENTRY")
     startedAt       DateTime      @map("DTM_STARTED_AT_TIME_ENTRY")
     endedAt         DateTime?     @map("DTM_ENDED_AT_TIME_ENTRY")
@@ -709,15 +723,53 @@ model TimeEntry {
     createdAt       DateTime      @default(now()) @map("DTM_CREATED_AT")
     updatedAt       DateTime      @updatedAt @map("DTM_UPDATED_AT")
 
-    process LegalProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
-    user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    firm    Firm         @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    process      LegalProcess           @relation(fields: [processId], references: [id], onDelete: Cascade)
+    user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    firm         Firm                   @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    participants TimeEntryParticipant[]
 
     @@index([processId])
     @@index([userId])
     @@index([firmId])
     @@index([endedAt])
     @@map("TIME_ENTRY")
+}
+
+// ENTRADAS DE VALOR DE PROCESO
+model ProcessValueEntry {
+    id          String    @id @default(uuid()) @map("UID_PROCESS_VALUE_ENTRY")
+    processId   String    @map("UID_LEGAL_PROCESS")
+    firmId      String    @map("UID_FIRM")
+    amount      Float     @map("DEC_AMOUNT_PROCESS_VALUE_ENTRY")
+    description String    @map("STR_DESCRIPTION_PROCESS_VALUE_ENTRY")
+    createdBy   String    @map("UID_CREATED_BY_PROCESS_VALUE_ENTRY")
+    deletedAt   DateTime? @map("DTM_DELETED_AT_PROCESS_VALUE_ENTRY")
+    createdAt   DateTime  @default(now()) @map("DTM_CREATED_AT")
+    updatedAt   DateTime  @updatedAt @map("DTM_UPDATED_AT")
+
+    process LegalProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+    creator User         @relation("ProcessValueEntryCreator", fields: [createdBy], references: [id])
+
+    @@index([processId])
+    @@index([deletedAt])
+    @@map("PROCESS_VALUE_ENTRY")
+}
+
+// PARTICIPANTES DE HORA COMPARTIDA
+model TimeEntryParticipant {
+    id          String   @id @default(uuid()) @map("UID_TIME_ENTRY_PARTICIPANT")
+    timeEntryId String   @map("UID_TIME_ENTRY")
+    userId      String   @map("UID_USER")
+    firmId      String   @map("UID_FIRM")
+    createdAt   DateTime @default(now()) @map("DTM_CREATED_AT")
+
+    timeEntry TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+    user      User      @relation("TimeEntryParticipations", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([timeEntryId, userId])
+    @@index([timeEntryId])
+    @@index([userId])
+    @@map("TIME_ENTRY_PARTICIPANT")
 }
 
 // BIBLIOTECA JURIDICA (LEGALITO RAG)

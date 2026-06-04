@@ -16,6 +16,9 @@ export class FirmEntity implements Firm
     description: string | null;
     logoUrl: string | null;
     cloudPublicId: string | null;
+    firmHourlyRate: number | null;
+    dailyBillableGoalHours: number | null;
+    dailyNonBillableGoalHours: number | null;
     createdBy: string;
     deletedAt: Date | null;
     createdAt: Date;

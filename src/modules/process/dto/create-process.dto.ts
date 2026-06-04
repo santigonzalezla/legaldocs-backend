@@ -1,6 +1,6 @@
 import {ApiProperty} from '@nestjs/swagger';
 import {Type} from 'class-transformer';
-import {IsDate, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID} from 'class-validator';
+import {IsDate, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, IsUUID} from 'class-validator';
 import {ProcessStatus} from '../../../../generated/prisma/client';
 
 export class CreateProcessDto
@@ -61,4 +61,10 @@ export class CreateProcessDto
     @IsOptional()
     @ApiProperty({description: 'ID del miembro del equipo asignado', example: 'uuid-v4', required: false})
     assignedTo?: string;
+
+    @IsNumber()
+    @IsPositive()
+    @IsOptional()
+    @ApiProperty({description: 'Valor inicial pactado del proceso en COP', example: 10000000, required: false})
+    processValue?: number;
 }

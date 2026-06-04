@@ -36,10 +36,10 @@ export class TimeEntryController
     }
 
     @Get('analytics')
-    @ApiOperation({summary: 'Analíticas de tiempo para toda la firma (por usuario y por proceso)'})
-    async getAnalytics(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string)
+    @ApiOperation({summary: 'Analíticas de tiempo para toda la firma (por usuario y por proceso). Pasar ?date=YYYY-MM-DD para meta diaria de esa fecha.'})
+    async getAnalytics(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Query('date') date?: string)
     {
-        return this.timeEntryService.getAnalytics(user.userId, firmId);
+        return this.timeEntryService.getAnalytics(user.userId, firmId, date);
     }
 
     @Get()

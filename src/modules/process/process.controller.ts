@@ -10,6 +10,7 @@ import {CreateProcessDto} from './dto/create-process.dto';
 import {UpdateProcessDto} from './dto/update-process.dto';
 import {ProcessFiltersDto} from './dto/process-filters.dto';
 import {AddProcessTemplateDto} from './dto/add-process-template.dto';
+import {CreateProcessValueEntryDto} from './dto/create-process-value-entry.dto';
 
 @ApiTags('Process')
 @ApiHeader({name: 'X-Firm-Id', required: false, description: 'ID de la firma activa (selector de workspace)'})
@@ -87,5 +88,22 @@ export class ProcessController
     async removeTemplate(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Param('templateId') templateId: string = '')
     {
         return this.processService.removeTemplate(user.userId, firmId, id, templateId);
+    }
+
+    @Post(':id/value-entries')
+    @Roles(FirmMemberRole.ASSISTANT)
+    @ApiOperation({summary: 'Agregar una entrada de valor adicional al proceso'})
+    async addValueEntry(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Body() dto: CreateProcessValueEntryDto = {} as CreateProcessValueEntryDto)
+    {
+        return this.processService.addValueEntry(user.userId, firmId, id, dto);
+    }
+
+    @Delete(':id/value-entries/:entryId')
+    @Roles(FirmMemberRole.ASSISTANT)
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({summary: 'Eliminar una entrada de valor adicional del proceso'})
+    async removeValueEntry(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Param('entryId') entryId: string = '')
+    {
+        return this.processService.removeValueEntry(user.userId, firmId, id, entryId);
     }
 }
