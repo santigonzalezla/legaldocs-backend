@@ -3,9 +3,8 @@ import {ApiHeader, ApiOperation, ApiTags} from '@nestjs/swagger';
 import {DocumentService} from './document.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from '../firm/decorators/firm-id.decorator';
-import {Roles} from '../firm/decorators/roles.decorator';
+import {Permission} from '../permissions/decorators/permission.decorator';
 import {LoggedUser} from '../../interfaces/LoggedUser';
-import {FirmMemberRole} from '../../../generated/prisma/client';
 import {CreateDocumentDto} from './dto/create-document.dto';
 import {UpdateDocumentDto} from './dto/update-document.dto';
 import {DocumentFiltersDto} from './dto/document-filters.dto';
@@ -18,7 +17,7 @@ export class DocumentController
     constructor(private readonly documentService: DocumentService) {}
 
     @Post()
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('documents:create', 'Crear documentos')
     @ApiOperation({summary: 'Crear un nuevo documento legal'})
     async create(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Body() dto: CreateDocumentDto)
     {
@@ -26,6 +25,7 @@ export class DocumentController
     }
 
     @Get()
+    @Permission('documents:view', 'Ver documentos')
     @ApiOperation({summary: 'Listar documentos del despacho con filtros y paginación'})
     async findAll(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Query() filters: DocumentFiltersDto)
     {
@@ -33,6 +33,7 @@ export class DocumentController
     }
 
     @Get(':id')
+    @Permission('documents:view', 'Ver documentos')
     @ApiOperation({summary: 'Obtener un documento por ID'})
     async findOne(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
     {
@@ -40,7 +41,7 @@ export class DocumentController
     }
 
     @Patch(':id')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('documents:edit', 'Editar documentos')
     @ApiOperation({summary: 'Actualizar un documento'})
     async update(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string, @Body() dto: UpdateDocumentDto)
     {
@@ -48,7 +49,7 @@ export class DocumentController
     }
 
     @Delete(':id')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('documents:delete', 'Mover documentos a la papelera')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Mover documento a la papelera'})
     async remove(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
@@ -57,7 +58,7 @@ export class DocumentController
     }
 
     @Patch(':id/restore')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('documents:restore', 'Restaurar documentos')
     @ApiOperation({summary: 'Restaurar documento desde la papelera'})
     async restore(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
     {
@@ -65,7 +66,7 @@ export class DocumentController
     }
 
     @Delete(':id/permanent')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('documents:permanent-delete', 'Eliminar documentos permanentemente')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar documento permanentemente (LAWYER+)'})
     async permanentRemove(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
@@ -74,6 +75,7 @@ export class DocumentController
     }
 
     @Patch(':id/favorite')
+    @Permission('documents:toggle-favorite', 'Marcar/desmarcar documentos como favoritos')
     @ApiOperation({summary: 'Marcar o desmarcar documento como favorito'})
     async toggleFavorite(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
     {

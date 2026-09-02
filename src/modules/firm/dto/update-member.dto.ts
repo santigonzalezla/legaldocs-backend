@@ -1,18 +1,16 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {IsEnum, IsOptional} from 'class-validator';
-import {FirmMemberRole, FirmMemberStatus} from '../../../../generated/prisma/client';
+import {IsEnum, IsOptional, IsUUID} from 'class-validator';
+import {FirmMemberStatus} from '../../../../generated/prisma/client';
 
 export class UpdateMemberDto
 {
-    @IsEnum(FirmMemberRole)
+    @IsUUID()
     @IsOptional()
     @ApiProperty({
-        description: 'Nuevo rol del miembro en el despacho',
-        example: FirmMemberRole.ADMIN,
-        enum: FirmMemberRole,
+        description: 'ID del nuevo FirmRole del miembro en el despacho',
         required: false,
     })
-    role?: FirmMemberRole;
+    firmRoleId?: string;
 
     @IsEnum(FirmMemberStatus)
     @IsOptional()

@@ -1,6 +1,7 @@
 import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
+import {PermissionsService} from '../permissions/permissions.service';
 import {StartTimerDto} from './dto/start-timer.dto';
 import {CreateManualEntryDto} from './dto/create-manual-entry.dto';
 import {TimeEntryEntity, TimeEntryWithUserEntity} from './entities/time-entry.entity';
@@ -11,9 +12,25 @@ export class TimeEntryService
     private readonly logger = new Logger(TimeEntryService.name);
 
     constructor(
-        private readonly prisma:       PrismaService,
-        private readonly firmService:  FirmService,
+        private readonly prisma:            PrismaService,
+        private readonly firmService:       FirmService,
+        private readonly permissionsService: PermissionsService,
     ) {}
+
+    // "Ver todo el despacho" se resuelve reusando time_entries:analytics — quien
+    // puede ver estadísticas de la firma también puede ver el calendario de
+    // todos; quien no, solo ve (y gestiona) sus propias entradas.
+    private async canViewAllEntries(userId: string, firmId?: string): Promise<boolean>
+    {
+        const {isAdmin, permissionKeys} = await this.permissionsService.getEffectivePermissions(userId, firmId);
+        return isAdmin || permissionKeys.includes('time_entries:analytics');
+    }
+
+    private async canViewTeam(userId: string, firmId?: string): Promise<boolean>
+    {
+        const {isAdmin, permissionKeys} = await this.permissionsService.getEffectivePermissions(userId, firmId);
+        return isAdmin || permissionKeys.includes('team:view');
+    }
 
     async startTimer(userId: string, firmId?: string, dto: StartTimerDto = {} as StartTimerDto): Promise<TimeEntryEntity>
     {
@@ -87,7 +104,10 @@ export class TimeEntryService
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
-            const sharedIds  = dto.sharedWithUserIds?.filter(id => id !== userId) ?? [];
+            // sharedWithUserIds requiere team:view — sin eso, se ignora aunque
+            // venga en el body (no confiar en que el frontend ya lo oculte).
+            const canShare   = await this.canViewTeam(userId, firmId);
+            const sharedIds  = canShare ? (dto.sharedWithUserIds?.filter(id => id !== userId) ?? []) : [];
             const isShared   = sharedIds.length > 0;
             const startedAt  = dto.startedAt ?? new Date();
             const endedAt    = new Date(startedAt.getTime() + dto.durationMinutes * 60_000);
@@ -131,9 +151,14 @@ export class TimeEntryService
     {
         try
         {
-            const firm = await this.firmService.getMyFirm(userId, firmId);
+            const firm    = await this.firmService.getMyFirm(userId, firmId);
+            const seesAll = await this.canViewAllEntries(userId, firmId);
 
-            const where = processId ? {processId, firmId: firm.id} : {firmId: firm.id};
+            const where = {
+                ...(processId ? {processId} : {}),
+                firmId: firm.id,
+                ...(seesAll ? {} : {userId}),
+            };
 
             const result = await this.prisma.timeEntry.findMany({
                 where,
@@ -180,16 +205,49 @@ export class TimeEntryService
         }
     }
 
+    // Versión reducida de getAnalytics para cualquiera con time_entries:view
+    // (no time_entries:analytics): mismo shape que espera el calendario para
+    // la barra de metas del día/mes, pero sin el desglose de otros usuarios —
+    // se filtra acá, antes de que la respuesta salga del servidor.
+    async getMyGoalProgress(userId: string, firmId?: string, date?: string): Promise<Record<string, any>>
+    {
+        const analytics = await this.getAnalytics(userId, firmId, date, {});
+
+        return {
+            currentUserId: analytics.currentUserId,
+            firm:          analytics.firm,
+            byUser:        (analytics.byUser ?? []).filter((entry: {userId: string}) => entry.userId === userId),
+        };
+    }
+
     // ── Analytics (firma completa) ─────────────────────────────────────────────
 
-    async getAnalytics(userId: string, firmId?: string, date?: string): Promise<Record<string, any>>
+    async getAnalytics(
+        userId: string,
+        firmId?: string,
+        date?: string,
+        filters: {startDate?: string; endDate?: string; processId?: string; lawyerId?: string} = {},
+    ): Promise<Record<string, any>>
     {
         try
         {
             const firm = await this.firmService.getMyFirm(userId, firmId);
 
+            const startedAtFilter = filters.startDate || filters.endDate
+                ? {
+                    ...(filters.startDate && {gte: new Date(`${filters.startDate}T00:00:00`)}),
+                    ...(filters.endDate   && {lte: new Date(`${filters.endDate}T23:59:59`)}),
+                }
+                : undefined;
+
             const entries = await this.prisma.timeEntry.findMany({
-                where:   {firmId: firm.id, durationMinutes: {not: null}},
+                where: {
+                    firmId:          firm.id,
+                    durationMinutes: {not: null},
+                    ...(startedAtFilter    && {startedAt: startedAtFilter}),
+                    ...(filters.processId  && {processId: filters.processId}),
+                    ...(filters.lawyerId   && {userId: filters.lawyerId}),
+                },
                 include: {
                     user:         {select: {firstName: true, lastName: true}},
                     process:      {select: {title: true}},

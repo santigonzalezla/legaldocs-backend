@@ -3,9 +3,8 @@ import {ApiHeader, ApiOperation, ApiTags} from '@nestjs/swagger';
 import {ProcessService} from './process.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from '../firm/decorators/firm-id.decorator';
-import {Roles} from '../firm/decorators/roles.decorator';
+import {Permission} from '../permissions/decorators/permission.decorator';
 import {LoggedUser} from '../../interfaces/LoggedUser';
-import {FirmMemberRole} from '../../../generated/prisma/client';
 import {CreateProcessDto} from './dto/create-process.dto';
 import {UpdateProcessDto} from './dto/update-process.dto';
 import {ProcessFiltersDto} from './dto/process-filters.dto';
@@ -20,7 +19,7 @@ export class ProcessController
     constructor(private readonly processService: ProcessService) {}
 
     @Post()
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('processes:create', 'Crear procesos legales')
     @ApiOperation({summary: 'Crear un nuevo proceso legal'})
     async create(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Body() dto: CreateProcessDto = {} as CreateProcessDto)
     {
@@ -28,13 +27,23 @@ export class ProcessController
     }
 
     @Get()
+    @Permission('processes:view', 'Ver procesos legales')
     @ApiOperation({summary: 'Listar procesos del despacho con filtros y paginación'})
     async findAll(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Query() filters: ProcessFiltersDto = {})
     {
         return this.processService.findAll(user.userId, firmId, filters);
     }
 
+    @Get('client-options')
+    @Permission('processes:view', 'Ver procesos legales')
+    @ApiOperation({summary: 'Lista mínima de clientes (id + nombre) para asignar un proceso'})
+    async getClientOptions(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string)
+    {
+        return this.processService.getClientOptions(user.userId, firmId);
+    }
+
     @Get(':id')
+    @Permission('processes:view', 'Ver procesos legales')
     @ApiOperation({summary: 'Obtener un proceso por ID'})
     async findOne(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
     {
@@ -42,7 +51,7 @@ export class ProcessController
     }
 
     @Patch(':id')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('processes:edit', 'Editar procesos legales')
     @ApiOperation({summary: 'Actualizar un proceso legal'})
     async update(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Body() dto: UpdateProcessDto = {})
     {
@@ -50,7 +59,7 @@ export class ProcessController
     }
 
     @Delete(':id')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('processes:delete', 'Eliminar procesos legales')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar un proceso (soft delete)'})
     async remove(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
@@ -59,7 +68,7 @@ export class ProcessController
     }
 
     @Patch(':id/restore')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('processes:restore', 'Restaurar procesos legales')
     @ApiOperation({summary: 'Restaurar un proceso eliminado'})
     async restore(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
     {
@@ -67,6 +76,7 @@ export class ProcessController
     }
 
     @Get(':id/templates')
+    @Permission('processes:view', 'Ver procesos legales')
     @ApiOperation({summary: 'Listar plantillas asociadas al proceso'})
     async getTemplates(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
     {
@@ -74,7 +84,7 @@ export class ProcessController
     }
 
     @Post(':id/templates')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('processes:manage-templates', 'Asociar/desasociar plantillas a procesos')
     @ApiOperation({summary: 'Asociar una plantilla al proceso'})
     async addTemplate(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Body() dto: AddProcessTemplateDto = {} as AddProcessTemplateDto)
     {
@@ -82,7 +92,7 @@ export class ProcessController
     }
 
     @Delete(':id/templates/:templateId')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('processes:manage-templates', 'Asociar/desasociar plantillas a procesos')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Desvincular una plantilla del proceso'})
     async removeTemplate(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Param('templateId') templateId: string = '')
@@ -91,7 +101,7 @@ export class ProcessController
     }
 
     @Post(':id/value-entries')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('processes:manage-value-entries', 'Gestionar entradas de valor de procesos')
     @ApiOperation({summary: 'Agregar una entrada de valor adicional al proceso'})
     async addValueEntry(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Body() dto: CreateProcessValueEntryDto = {} as CreateProcessValueEntryDto)
     {
@@ -99,7 +109,7 @@ export class ProcessController
     }
 
     @Delete(':id/value-entries/:entryId')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('processes:manage-value-entries', 'Gestionar entradas de valor de procesos')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar una entrada de valor adicional del proceso'})
     async removeValueEntry(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Param('entryId') entryId: string = '')

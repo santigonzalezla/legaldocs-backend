@@ -3,9 +3,8 @@ import {ApiHeader, ApiOperation, ApiTags} from '@nestjs/swagger';
 import {BranchService} from './branch.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from '../firm/decorators/firm-id.decorator';
-import {Roles} from '../firm/decorators/roles.decorator';
+import {Permission} from '../permissions/decorators/permission.decorator';
 import {LoggedUser} from '../../interfaces/LoggedUser';
-import {FirmMemberRole} from '../../../generated/prisma/client';
 import {CreateBranchDto} from './dto/create-branch.dto';
 import {UpdateBranchDto} from './dto/update-branch.dto';
 import {BranchFiltersDto} from './dto/branch-filters.dto';
@@ -25,7 +24,7 @@ export class BranchController
     }
 
     @Post()
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('branches:create', 'Crear ramas jurídicas')
     @ApiOperation({summary: 'Crear rama jurídica personalizada (LAWYER+)'})
     async create(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Body() dto: CreateBranchDto)
     {
@@ -33,7 +32,7 @@ export class BranchController
     }
 
     @Patch(':id')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('branches:edit', 'Editar ramas jurídicas')
     @ApiOperation({summary: 'Actualizar rama jurídica del despacho (LAWYER+)'})
     async update(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string, @Body() dto: UpdateBranchDto)
     {
@@ -41,7 +40,7 @@ export class BranchController
     }
 
     @Delete(':id')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('branches:delete', 'Eliminar ramas jurídicas')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar rama jurídica del despacho (LAWYER+)'})
     async remove(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)

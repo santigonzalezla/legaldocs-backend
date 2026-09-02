@@ -1,6 +1,8 @@
 import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
+import {ClientService} from '../client/client.service';
+import {ClientPickerOptionEntity} from '../client/entities/client-picker-option.entity';
 import {CreateProcessDto} from './dto/create-process.dto';
 import {UpdateProcessDto} from './dto/update-process.dto';
 import {ProcessFiltersDto} from './dto/process-filters.dto';
@@ -19,7 +21,17 @@ export class ProcessService
     constructor(
         private readonly prisma: PrismaService,
         private readonly firmService: FirmService,
+        private readonly clientService: ClientService,
     ) {}
+
+    // Composición entre módulos: la ruta vive en ProcessController (gateada por
+    // processes:view, que Abogado ya tiene), pero delega en ClientService para
+    // no duplicar la lógica de armado del nombre. Así el permiso de la ruta
+    // siempre corresponde al módulo dueño del controller, sin excepciones.
+    async getClientOptions(userId: string, firmId?: string): Promise<ClientPickerOptionEntity[]>
+    {
+        return this.clientService.listPickerOptions(userId, firmId);
+    }
 
     async create(userId: string, firmId?: string, dto: CreateProcessDto = {} as CreateProcessDto): Promise<LegalProcessEntity>
     {
@@ -99,6 +111,17 @@ export class ProcessService
                         where:   {deletedAt: null},
                         select:  {id: true, amount: true, description: true, createdBy: true, createdAt: true},
                         orderBy: {createdAt: 'asc'},
+                    },
+                    client: {
+                        select: {
+                            id:             true,
+                            type:           true,
+                            firstName:      true,
+                            lastName:       true,
+                            companyName:    true,
+                            documentType:   true,
+                            documentNumber: true,
+                        },
                     },
                 },
             }) as LegalProcessWithEntriesEntity | null;

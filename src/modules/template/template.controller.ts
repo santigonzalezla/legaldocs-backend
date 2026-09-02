@@ -18,9 +18,8 @@ import {memoryStorage} from 'multer';
 import {TemplateService} from './template.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from '../firm/decorators/firm-id.decorator';
-import {Roles} from '../firm/decorators/roles.decorator';
+import {Permission} from '../permissions/decorators/permission.decorator';
 import {LoggedUser} from '../../interfaces/LoggedUser';
-import {FirmMemberRole} from '../../../generated/prisma/client';
 import {CreateTemplateDto} from './dto/create-template.dto';
 import {UpdateTemplateDto} from './dto/update-template.dto';
 import {TemplateFiltersDto} from './dto/template-filters.dto';
@@ -33,7 +32,7 @@ export class TemplateController
     constructor(private readonly templateService: TemplateService) {}
 
     @Post('parse-upload')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('templates:parse-upload', 'Subir y analizar plantillas Word')
     @UseInterceptors(FileInterceptor('file', {storage: memoryStorage(), limits: {fileSize: 10 * 1024 * 1024}}))
     @ApiOperation({summary: 'Parsear plantilla Word (.docx) y extraer variables (LAWYER+)'})
     @ApiConsumes('multipart/form-data')
@@ -44,6 +43,7 @@ export class TemplateController
     }
 
     @Get()
+    @Permission('templates:view', 'Ver plantillas')
     @ApiOperation({summary: 'Listar plantillas con filtros'})
     async findAll(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Query() filters: TemplateFiltersDto)
     {
@@ -51,6 +51,7 @@ export class TemplateController
     }
 
     @Get(':id')
+    @Permission('templates:view', 'Ver plantillas')
     @ApiOperation({summary: 'Obtener una plantilla por ID'})
     async findOne(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
     {
@@ -58,7 +59,7 @@ export class TemplateController
     }
 
     @Post()
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('templates:create', 'Crear plantillas')
     @ApiOperation({summary: 'Crear plantilla personalizada (LAWYER+)'})
     async create(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Body() dto: CreateTemplateDto)
     {
@@ -66,7 +67,7 @@ export class TemplateController
     }
 
     @Patch(':id')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('templates:edit', 'Editar plantillas')
     @ApiOperation({summary: 'Actualizar plantilla del despacho (LAWYER+)'})
     async update(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string, @Body() dto: UpdateTemplateDto)
     {
@@ -74,7 +75,7 @@ export class TemplateController
     }
 
     @Delete(':id')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('templates:delete', 'Eliminar plantillas')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar plantilla del despacho (LAWYER+)'})
     async remove(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
@@ -83,7 +84,7 @@ export class TemplateController
     }
 
     @Post(':id/copy')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('templates:duplicate', 'Duplicar plantillas')
     @ApiOperation({summary: 'Copiar plantilla al despacho (LAWYER+)'})
     async copyTemplate(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
     {
@@ -91,6 +92,7 @@ export class TemplateController
     }
 
     @Patch(':id/favorite')
+    @Permission('templates:toggle-favorite', 'Marcar/desmarcar plantillas como favoritas')
     @ApiOperation({summary: 'Marcar o desmarcar plantilla como favorita'})
     async toggleFavorite(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('id') id: string)
     {

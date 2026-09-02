@@ -5,7 +5,9 @@ import {CreateClientDto} from './dto/create-client.dto';
 import {UpdateClientDto} from './dto/update-client.dto';
 import {ClientFiltersDto} from './dto/client-filters.dto';
 import {ClientEntity} from './entities/client.entity';
+import {ClientPickerOptionEntity} from './entities/client-picker-option.entity';
 import {Paginated} from '../../interfaces/Paginated';
+import {ClientType} from '../../../generated/prisma/client';
 
 @Injectable()
 export class ClientService
@@ -155,6 +157,36 @@ export class ClientService
         {
             if (error instanceof HttpException) throw error;
             this.logger.error(`restore → failed id=${id}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    // Sin ruta propia — pensado para que otros módulos (ej. ProcessService) lo
+    // inyecten vía ClientModule.exports cuando solo necesitan un selector
+    // id+nombre, sin requerir el permiso completo clients:view.
+    async listPickerOptions(userId: string, firmId?: string): Promise<ClientPickerOptionEntity[]>
+    {
+        try
+        {
+            const firm = await this.firmService.getMyFirm(userId, firmId);
+
+            const clients = await this.prisma.client.findMany({
+                where:   {firmId: firm.id, deletedAt: null},
+                select:  {id: true, type: true, firstName: true, lastName: true, companyName: true},
+                orderBy: {createdAt: 'asc'},
+            });
+
+            return clients.map(client => ({
+                id:   client.id,
+                name: client.type === ClientType.COMPANY
+                    ? (client.companyName ?? '—')
+                    : [client.firstName, client.lastName].filter(Boolean).join(' ') || '—',
+            }));
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`listPickerOptions → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

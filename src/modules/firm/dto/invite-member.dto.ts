@@ -1,7 +1,6 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {IsEmail, IsEnum, IsNotEmpty} from 'class-validator';
+import {IsEmail, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength} from 'class-validator';
 import {Transform} from 'class-transformer';
-import {FirmMemberRole} from '../../../../generated/prisma/client';
 
 export class InviteMemberDto
 {
@@ -15,12 +14,33 @@ export class InviteMemberDto
     })
     email: string;
 
-    @IsEnum(FirmMemberRole)
+    @IsUUID()
+    @IsNotEmpty()
     @ApiProperty({
-        description: 'Rol que tendrá el miembro invitado en el despacho',
-        example: FirmMemberRole.LAWYER,
-        enum: FirmMemberRole,
+        description: 'ID del FirmRole que tendrá el miembro invitado en el despacho',
         required: true,
     })
-    role: FirmMemberRole;
+    firmRoleId: string;
+
+    @Transform(({value}) => (typeof value === 'string' ? value.trim() : value))
+    @IsString()
+    @IsOptional()
+    @MaxLength(80)
+    @ApiProperty({
+        description: 'Nombre del miembro (opcional; si se omite se usa la parte local del correo)',
+        example: 'Juan',
+        required: false,
+    })
+    firstName?: string;
+
+    @Transform(({value}) => (typeof value === 'string' ? value.trim() : value))
+    @IsString()
+    @IsOptional()
+    @MaxLength(80)
+    @ApiProperty({
+        description: 'Apellido del miembro (opcional)',
+        example: 'Pérez',
+        required: false,
+    })
+    lastName?: string;
 }

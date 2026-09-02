@@ -6,6 +6,7 @@ export class FirmMemberEntity implements FirmMember
     firmId: string;
     userId: string | null;
     role: FirmMemberRole;
+    firmRoleId: string | null;
     status: FirmMemberStatus;
     inviteEmail: string | null;
     inviteToken: string | null;

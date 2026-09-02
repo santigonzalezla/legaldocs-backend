@@ -21,6 +21,7 @@ export class FirmEntity implements Firm
     dailyNonBillableGoalHours: number | null;
     createdBy: string;
     deletedAt: Date | null;
+    purgeAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }

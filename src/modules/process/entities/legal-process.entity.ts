@@ -32,4 +32,18 @@ export class LegalProcessWithEntriesEntity extends LegalProcessEntity
         createdBy: string;
         createdAt: Date;
     }[];
+
+    // Subconjunto de Client (sin email/teléfono/dirección) embebido para que la
+    // vista de un proceso muestre a qué cliente pertenece sin requerir el
+    // permiso clients:view — el "need to know" acá es el cliente DE ESTE
+    // proceso, no la lista completa de clientes de la firma.
+    client: {
+        id:             string;
+        type:           string;
+        firstName:      string | null;
+        lastName:       string | null;
+        companyName:    string | null;
+        documentType:   string | null;
+        documentNumber: string | null;
+    } | null;
 }

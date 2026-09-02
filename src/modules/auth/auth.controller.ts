@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import { Controller, Post, Body, Req, UseGuards, Get, Res, HttpCode, HttpStatus, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -11,6 +11,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+import { SelfSignupGuard } from './guards/self-signup.guard';
 import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { MicrosoftOAuthGuard } from './guards/microsoft-oauth.guard';
 import { LoggedUser } from '../../interfaces/LoggedUser';
@@ -24,7 +25,9 @@ export class AuthController
     constructor(private readonly authService: AuthService) {}
 
     @Public()
+    @UseGuards(SelfSignupGuard)
     @Post('register')
+    @ApiHeader({ name: 'x-provision-key', required: false, description: 'Clave de aprovisionamiento (solo para alta manual de owners cuando SELF_SIGNUP_ENABLED=false)' })
     @ApiOperation({ summary: 'Registrar nuevo usuario' })
     async register(@Body() dto: RegisterDto, @Req() req: Request)
     {

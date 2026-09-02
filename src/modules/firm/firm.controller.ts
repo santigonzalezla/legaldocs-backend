@@ -1,11 +1,11 @@
-import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query} from '@nestjs/common';
+import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards} from '@nestjs/common';
 import {ApiHeader, ApiOperation, ApiQuery, ApiTags} from '@nestjs/swagger';
 import {FirmService} from './firm.service';
+import {SelfSignupGuard} from '../auth/guards/self-signup.guard';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from './decorators/firm-id.decorator';
-import {Roles} from './decorators/roles.decorator';
+import {Permission} from '../permissions/decorators/permission.decorator';
 import {LoggedUser} from '../../interfaces/LoggedUser';
-import {FirmMemberRole} from '../../../generated/prisma/client';
 import {CreateFirmDto} from './dto/create-firm.dto';
 import {UpdateFirmDto} from './dto/update-firm.dto';
 import {InviteMemberDto} from './dto/invite-member.dto';
@@ -33,6 +33,13 @@ export class FirmController
         return this.firmService.getMyInvitations(user.userId);
     }
 
+    @Get('deleted')
+    @ApiOperation({summary: 'Listar despachos eliminados por el usuario, recuperables dentro de los 30 días'})
+    async listDeletedFirms(@CurrentUser() user: LoggedUser)
+    {
+        return this.firmService.listDeletedFirms(user.userId);
+    }
+
     @Post('my-invitations/reject')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Rechazar invitación a un despacho'})
@@ -43,6 +50,8 @@ export class FirmController
     }
 
     @Post()
+    @UseGuards(SelfSignupGuard)
+    @ApiHeader({name: 'x-provision-key', required: false, description: 'Clave de aprovisionamiento (solo para alta manual cuando SELF_SIGNUP_ENABLED=false)'})
     @ApiOperation({summary: 'Crear despacho para el usuario autenticado'})
     async createFirm(@CurrentUser() user: LoggedUser, @Body() dto: CreateFirmDto)
     {
@@ -57,7 +66,7 @@ export class FirmController
     }
 
     @Patch('me')
-    @Roles(FirmMemberRole.ADMIN)
+    @Permission('firm_settings:edit', 'Editar datos de la firma')
     @ApiOperation({summary: 'Actualizar datos del despacho (solo ADMIN)'})
     async updateFirm(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Body() dto: UpdateFirmDto)
     {
@@ -65,15 +74,24 @@ export class FirmController
     }
 
     @Delete('me')
-    @Roles(FirmMemberRole.ADMIN)
+    @Permission('firm_settings:delete', 'Eliminar el despacho')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({summary: 'Eliminar despacho (solo propietario)'})
+    @ApiOperation({summary: 'Eliminar despacho (lógico, recuperable 30 días — solo ADMIN)'})
     async deleteFirm(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined)
     {
         return this.firmService.deleteFirm(user.userId, firmId);
     }
 
+    @Post('restore/:firmId')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({summary: 'Restaurar un despacho eliminado dentro del plazo de 30 días (solo propietario)'})
+    async restoreFirm(@CurrentUser() user: LoggedUser, @Param('firmId') firmId: string)
+    {
+        return this.firmService.restoreFirm(user.userId, firmId);
+    }
+
     @Get('me/members')
+    @Permission('team:view', 'Ver miembros del equipo')
     @ApiOperation({summary: 'Listar miembros del despacho'})
     async getMembers(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined)
     {
@@ -81,7 +99,7 @@ export class FirmController
     }
 
     @Post('me/members')
-    @Roles(FirmMemberRole.ADMIN)
+    @Permission('team:invite-member', 'Invitar miembros al equipo')
     @ApiOperation({summary: 'Invitar un nuevo miembro al despacho (solo ADMIN)'})
     async inviteMember(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Body() dto: InviteMemberDto)
     {
@@ -89,7 +107,7 @@ export class FirmController
     }
 
     @Patch('me/members/:memberId')
-    @Roles(FirmMemberRole.ADMIN)
+    @Permission('team:update-member', 'Cambiar rol de miembros del equipo')
     @ApiOperation({summary: 'Actualizar rol o estado de un miembro (solo ADMIN)'})
     async updateMember(
         @CurrentUser() user: LoggedUser,
@@ -111,7 +129,7 @@ export class FirmController
     }
 
     @Delete('me/members/:memberId')
-    @Roles(FirmMemberRole.ADMIN)
+    @Permission('team:remove-member', 'Eliminar miembros del equipo')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar un miembro del despacho (solo ADMIN)'})
     async removeMember(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('memberId') memberId: string)
@@ -120,6 +138,7 @@ export class FirmController
     }
 
     @Get('me/specialties')
+    @Permission('firm_settings:view', 'Ver configuración de la firma')
     @ApiOperation({summary: 'Listar especialidades jurídicas del despacho'})
     async getSpecialties(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined)
     {
@@ -127,7 +146,7 @@ export class FirmController
     }
 
     @Post('me/specialties')
-    @Roles(FirmMemberRole.ADMIN)
+    @Permission('firm_settings:add-specialty', 'Agregar especialidades jurídicas')
     @ApiOperation({summary: 'Agregar especialidad jurídica (solo ADMIN)'})
     async addSpecialty(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Body() dto: AddSpecialtyDto)
     {
@@ -135,7 +154,7 @@ export class FirmController
     }
 
     @Delete('me/specialties/:specialtyId')
-    @Roles(FirmMemberRole.ADMIN)
+    @Permission('firm_settings:remove-specialty', 'Eliminar especialidades jurídicas')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar especialidad del despacho (solo ADMIN)'})
     async removeSpecialty(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Param('specialtyId') specialtyId: string)

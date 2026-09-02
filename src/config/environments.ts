@@ -27,6 +27,9 @@ interface EnvironmentVariables
     R2_PUBLIC_URL: string;
     // AI
     OPENAI_API_KEY: string;
+    // Provisioning / access model
+    SELF_SIGNUP_ENABLED: boolean;
+    PROVISION_KEY: string;
 }
 
 const environmentSchema = joi.object({
@@ -51,7 +54,9 @@ const environmentSchema = joi.object({
     R2_ACCESS_KEY_ID: joi.string().required(),
     R2_SECRET_ACCESS_KEY: joi.string().required(),
     R2_PUBLIC_URL: joi.string().required(),
-    OPENAI_API_KEY: joi.string().required()
+    OPENAI_API_KEY: joi.string().required(),
+    SELF_SIGNUP_ENABLED: joi.boolean().default(false),
+    PROVISION_KEY: joi.string().allow('').default('')
 }).unknown();
 
 const {error, value} = environmentSchema.validate({...process.env});
@@ -82,5 +87,7 @@ export const environmentVariables = {
     r2AccessKeyId: env.R2_ACCESS_KEY_ID,
     r2SecretAccessKey: env.R2_SECRET_ACCESS_KEY,
     r2PublicUrl: env.R2_PUBLIC_URL,
-    openaiApiKey: env.OPENAI_API_KEY
+    openaiApiKey: env.OPENAI_API_KEY,
+    selfSignupEnabled: env.SELF_SIGNUP_ENABLED,
+    provisionKey: env.PROVISION_KEY
 };

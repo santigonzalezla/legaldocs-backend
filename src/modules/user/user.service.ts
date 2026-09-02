@@ -22,12 +22,15 @@ export class UserService
         {
             const user = await this.prisma.user.findUnique({
                 where: {id: userId, deletedAt: null},
+                include: {credentials: {select: {mustChangePassword: true}}},
             });
 
             if (!user) throw new NotFoundException('Usuario no encontrado');
 
+            const {credentials, ...rest} = user;
+
             this.logger.log(`findMe → success userId=${userId}`);
-            return user;
+            return {...rest, mustChangePassword: credentials?.mustChangePassword ?? false};
         }
         catch (error)
         {
@@ -85,7 +88,7 @@ export class UserService
 
             await this.prisma.credentials.update({
                 where: {id: credentials.id},
-                data: {password: hashed},
+                data: {password: hashed, mustChangePassword: false},
             });
 
             this.logger.log(`changePassword → success userId=${userId}`);

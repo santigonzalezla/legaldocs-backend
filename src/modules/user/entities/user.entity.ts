@@ -20,4 +20,7 @@ export class UserEntity implements User
     deletedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
+
+    // Derivado de Credentials — true si el usuario debe cambiar su clave temporal.
+    mustChangePassword?: boolean;
 }

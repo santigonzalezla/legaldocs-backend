@@ -18,6 +18,10 @@ export interface AuthTokens {
     refreshToken: string;
 }
 
+export interface LoginResult extends AuthTokens {
+    mustChangePassword: boolean;
+}
+
 @Injectable()
 export class AuthService
 {
@@ -112,7 +116,7 @@ export class AuthService
 
     // ─── LOGIN ────────────────────────────────────────────────────────────────────
 
-    async login(dto: LoginDto, req: Request): Promise<AuthTokens>
+    async login(dto: LoginDto, req: Request): Promise<LoginResult>
     {
         try
         {
@@ -138,7 +142,7 @@ export class AuthService
 
             const tokens = await this.generateTokens(credentials.id, credentials.userId, credentials.email, req);
             this.logger.log(`login → success userId=${credentials.userId}`);
-            return tokens;
+            return {...tokens, mustChangePassword: credentials.mustChangePassword};
         }
         catch (error)
         {
@@ -150,7 +154,7 @@ export class AuthService
 
     // ─── REFRESH ──────────────────────────────────────────────────────────────────
 
-    async refreshTokens(user: LoggedUser & {refreshToken: string}, req: Request): Promise<AuthTokens>
+    async refreshTokens(user: LoggedUser & {refreshToken: string}, req: Request): Promise<LoginResult>
     {
         try
         {
@@ -175,8 +179,14 @@ export class AuthService
             }
 
             const tokens = await this.generateTokens(user.sub, user.userId, user.email, req);
+
+            const creds = await this.prisma.credentials.findUnique({
+                where: {id: user.sub},
+                select: {mustChangePassword: true},
+            });
+
             this.logger.log(`refreshTokens → success userId=${user.userId}`);
-            return tokens;
+            return {...tokens, mustChangePassword: creds?.mustChangePassword ?? false};
         }
         catch (error)
         {
@@ -289,7 +299,7 @@ export class AuthService
 
     // ─── OAUTH ────────────────────────────────────────────────────────────────────
 
-    async handleOAuthLogin(profile: OAuthProfile, req: Request): Promise<AuthTokens>
+    async handleOAuthLogin(profile: OAuthProfile, req: Request): Promise<LoginResult>
     {
         try
         {
@@ -350,7 +360,7 @@ export class AuthService
 
             const tokens = await this.generateTokens(credentials!.id, credentials!.userId, credentials!.email, req);
             this.logger.log(`handleOAuthLogin → success userId=${credentials!.userId} provider=${profile.provider}`);
-            return tokens;
+            return {...tokens, mustChangePassword: false};
         }
         catch (error)
         {

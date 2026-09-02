@@ -3,9 +3,8 @@ import {ApiHeader, ApiOperation, ApiTags} from '@nestjs/swagger';
 import {ClientService} from './client.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from '../firm/decorators/firm-id.decorator';
-import {Roles} from '../firm/decorators/roles.decorator';
+import {Permission} from '../permissions/decorators/permission.decorator';
 import {LoggedUser} from '../../interfaces/LoggedUser';
-import {FirmMemberRole} from '../../../generated/prisma/client';
 import {CreateClientDto} from './dto/create-client.dto';
 import {UpdateClientDto} from './dto/update-client.dto';
 import {ClientFiltersDto} from './dto/client-filters.dto';
@@ -18,7 +17,7 @@ export class ClientController
     constructor(private readonly clientService: ClientService) {}
 
     @Post()
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('clients:create', 'Crear clientes')
     @ApiOperation({summary: 'Registrar un nuevo cliente'})
     async create(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Body() dto: CreateClientDto = {} as CreateClientDto)
     {
@@ -26,6 +25,7 @@ export class ClientController
     }
 
     @Get()
+    @Permission('clients:view', 'Ver clientes')
     @ApiOperation({summary: 'Listar clientes del despacho con filtros y paginación'})
     async findAll(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Query() filters: ClientFiltersDto = {})
     {
@@ -33,6 +33,7 @@ export class ClientController
     }
 
     @Get(':id')
+    @Permission('clients:view', 'Ver clientes')
     @ApiOperation({summary: 'Obtener un cliente por ID'})
     async findOne(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
     {
@@ -40,7 +41,7 @@ export class ClientController
     }
 
     @Patch(':id')
-    @Roles(FirmMemberRole.ASSISTANT)
+    @Permission('clients:edit', 'Editar clientes')
     @ApiOperation({summary: 'Actualizar datos de un cliente'})
     async update(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Body() dto: UpdateClientDto = {})
     {
@@ -48,7 +49,7 @@ export class ClientController
     }
 
     @Delete(':id')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('clients:delete', 'Eliminar clientes')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar un cliente (soft delete)'})
     async remove(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
@@ -57,7 +58,7 @@ export class ClientController
     }
 
     @Patch(':id/restore')
-    @Roles(FirmMemberRole.LAWYER)
+    @Permission('clients:restore', 'Restaurar clientes')
     @ApiOperation({summary: 'Restaurar un cliente eliminado'})
     async restore(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
     {

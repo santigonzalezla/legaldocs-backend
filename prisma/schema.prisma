@@ -187,6 +187,7 @@ model Credentials {
     emailVerifyToken String?   @map("STR_EMAIL_VERIFY_TOKEN_CREDENTIALS")
     resetToken       String?   @map("STR_RESET_TOKEN_CREDENTIALS")
     resetTokenExpiry DateTime? @map("DTM_RESET_TOKEN_EXPIRY_CREDENTIALS")
+    mustChangePassword Boolean @default(false) @map("BOOL_MUST_CHANGE_PASSWORD_CREDENTIALS")
     createdAt        DateTime  @default(now()) @map("DTM_CREATED_AT")
     updatedAt        DateTime  @updatedAt @map("DTM_UPDATED_AT")
 
@@ -271,6 +272,7 @@ model Firm {
     dailyNonBillableGoalHours Float?    @map("DEC_DAILY_NON_BILLABLE_GOAL_HOURS_FIRM")
     createdBy                 String    @map("UID_CREATED_BY_FIRM")
     deletedAt     DateTime? @map("DTM_DELETED_AT_FIRM")
+    purgeAt       DateTime? @map("DTM_PURGE_AT_FIRM")
     createdAt     DateTime  @default(now()) @map("DTM_CREATED_AT")
     updatedAt     DateTime  @updatedAt @map("DTM_UPDATED_AT")
 
@@ -286,6 +288,7 @@ model Firm {
     legalProcesses   LegalProcess[]
     timeEntries      TimeEntry[]
     libraryDocuments LibraryDocument[]
+    firmRoles        FirmRole[]
 
     @@index([deletedAt])
     @@map("FIRM")
@@ -306,6 +309,7 @@ model FirmMember {
     firmId          String           @map("UID_FIRM")
     userId          String?          @map("UID_USER")
     role            FirmMemberRole   @default(ASSISTANT) @map("STR_ROLE_FIRM_MEMBER")
+    firmRoleId      String?          @map("UID_FIRM_ROLE")
     status          FirmMemberStatus @default(PENDING) @map("STR_STATUS_FIRM_MEMBER")
     inviteEmail     String?          @map("STR_INVITE_EMAIL_FIRM_MEMBER")
     inviteToken     String?          @map("STR_INVITE_TOKEN_FIRM_MEMBER")
@@ -315,13 +319,78 @@ model FirmMember {
     createdAt       DateTime         @default(now()) @map("DTM_CREATED_AT")
     updatedAt       DateTime         @updatedAt @map("DTM_UPDATED_AT")
 
-    firm Firm  @relation(fields: [firmId], references: [id], onDelete: Cascade)
-    user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+    firm     Firm      @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+    firmRole FirmRole? @relation(fields: [firmRoleId], references: [id], onDelete: Restrict)
 
     @@unique([firmId, userId])
     @@index([firmId])
     @@index([inviteToken])
+    @@index([firmRoleId])
     @@map("FIRM_MEMBER")
+}
+
+// ROLES Y PERMISOS
+model Module {
+    id          String   @id @default(uuid()) @map("UID_MODULE")
+    key         String   @unique @map("STR_KEY_MODULE")
+    label       String   @map("STR_LABEL_MODULE")
+    description String?  @map("STR_DESCRIPTION_MODULE")
+    sortOrder   Int      @default(0) @map("NUM_SORT_ORDER_MODULE")
+    createdAt   DateTime @default(now()) @map("DTM_CREATED_AT")
+    updatedAt   DateTime @updatedAt @map("DTM_UPDATED_AT")
+
+    permissions Permission[]
+
+    @@map("MODULE")
+}
+
+model Permission {
+    id         String   @id @default(uuid()) @map("UID_PERMISSION")
+    key        String   @unique @map("STR_KEY_PERMISSION")
+    method     String   @map("STR_METHOD_PERMISSION")
+    path       String   @map("STR_PATH_PERMISSION")
+    moduleId   String   @map("UID_MODULE")
+    label      String   @map("STR_LABEL_PERMISSION")
+    deprecated Boolean  @default(false) @map("BOOL_DEPRECATED_PERMISSION")
+    createdAt  DateTime @default(now()) @map("DTM_CREATED_AT")
+    updatedAt  DateTime @updatedAt @map("DTM_UPDATED_AT")
+
+    module          Module           @relation(fields: [moduleId], references: [id])
+    rolePermissions RolePermission[]
+
+    @@index([moduleId])
+    @@map("PERMISSION")
+}
+
+model FirmRole {
+    id          String   @id @default(uuid()) @map("UID_FIRM_ROLE")
+    firmId      String   @map("UID_FIRM")
+    name        String   @map("STR_NAME_FIRM_ROLE")
+    description String?  @map("STR_DESCRIPTION_FIRM_ROLE")
+    slug        String?  @map("STR_SLUG_FIRM_ROLE")
+    isSystem    Boolean  @default(false) @map("BOOL_IS_SYSTEM_FIRM_ROLE")
+    createdAt   DateTime @default(now()) @map("DTM_CREATED_AT")
+    updatedAt   DateTime @updatedAt @map("DTM_UPDATED_AT")
+
+    firm            Firm             @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    rolePermissions RolePermission[]
+    members         FirmMember[]
+
+    @@unique([firmId, name])
+    @@index([firmId])
+    @@map("FIRM_ROLE")
+}
+
+model RolePermission {
+    firmRoleId   String @map("UID_FIRM_ROLE")
+    permissionId String @map("UID_PERMISSION")
+
+    firmRole   FirmRole   @relation(fields: [firmRoleId], references: [id], onDelete: Cascade)
+    permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+    @@id([firmRoleId, permissionId])
+    @@map("ROLE_PERMISSION")
 }
 
 // GENERADOR: RAMAS Y PLANTILLAS
@@ -427,7 +496,7 @@ model Document {
 
     template  DocumentTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
     branch    LegalBranch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
-    firm      Firm               @relation(fields: [firmId], references: [id])
+    firm      Firm               @relation(fields: [firmId], references: [id], onDelete: Cascade)
     author    User               @relation(fields: [createdBy], references: [id])
     favorites DocumentFavorite[]
     process   LegalProcess?      @relation(fields: [processId], references: [id], onDelete: SetNull)
@@ -519,7 +588,7 @@ model Subscription {
     createdAt                DateTime           @default(now()) @map("DTM_CREATED_AT")
     updatedAt                DateTime           @updatedAt @map("DTM_UPDATED_AT")
 
-    firm     Firm             @relation(fields: [firmId], references: [id])
+    firm     Firm             @relation(fields: [firmId], references: [id], onDelete: Cascade)
     plan     SubscriptionPlan @relation(fields: [planId], references: [id])
     invoices Invoice[]
 
@@ -544,8 +613,8 @@ model Invoice {
     createdAt          DateTime      @default(now()) @map("DTM_CREATED_AT")
     updatedAt          DateTime      @updatedAt @map("DTM_UPDATED_AT")
 
-    firm         Firm          @relation(fields: [firmId], references: [id])
-    subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+    firm         Firm          @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
     @@index([firmId])
     @@map("INVOICE")
