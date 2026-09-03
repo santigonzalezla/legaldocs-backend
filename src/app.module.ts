@@ -21,6 +21,8 @@ import {ClientModule} from './modules/client/client.module';
 import {ProcessModule} from './modules/process/process.module';
 import {TimeEntryModule} from './modules/time-entry/time-entry.module';
 import {LibraryModule} from './modules/library/library.module';
+import {LegalUpdatesModule} from './modules/legal-updates/legal-updates.module';
+import {DashboardModule} from './modules/dashboard/dashboard.module';
 import {AiModule} from './modules/ai/ai.module';
 import {MailModule} from './utils/mail/mail.module';
 import {PermissionsModule} from './modules/permissions/permissions.module';
@@ -41,6 +43,8 @@ import {PermissionsModule} from './modules/permissions/permissions.module';
         ProcessModule,
         TimeEntryModule,
         LibraryModule,
+        LegalUpdatesModule,
+        DashboardModule,
         AiModule,
         MailModule,
         PermissionsModule

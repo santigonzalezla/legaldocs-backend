@@ -30,6 +30,8 @@ interface EnvironmentVariables
     // Provisioning / access model
     SELF_SIGNUP_ENABLED: boolean;
     PROVISION_KEY: string;
+    // Actualizaciones legales
+    SOCRATA_APP_TOKEN: string;
 }
 
 const environmentSchema = joi.object({
@@ -56,7 +58,8 @@ const environmentSchema = joi.object({
     R2_PUBLIC_URL: joi.string().required(),
     OPENAI_API_KEY: joi.string().required(),
     SELF_SIGNUP_ENABLED: joi.boolean().default(false),
-    PROVISION_KEY: joi.string().allow('').default('')
+    PROVISION_KEY: joi.string().allow('').default(''),
+    SOCRATA_APP_TOKEN: joi.string().allow('').default('')
 }).unknown();
 
 const {error, value} = environmentSchema.validate({...process.env});
@@ -89,5 +92,6 @@ export const environmentVariables = {
     r2PublicUrl: env.R2_PUBLIC_URL,
     openaiApiKey: env.OPENAI_API_KEY,
     selfSignupEnabled: env.SELF_SIGNUP_ENABLED,
-    provisionKey: env.PROVISION_KEY
+    provisionKey: env.PROVISION_KEY,
+    socrataAppToken: env.SOCRATA_APP_TOKEN
 };

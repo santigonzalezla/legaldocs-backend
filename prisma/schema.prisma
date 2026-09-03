@@ -134,6 +134,29 @@ enum LibraryDocumentType {
     OTHER
 }
 
+enum LegalUpdateSource {
+    CORTE_CONSTITUCIONAL
+    CORTE_SUPREMA
+    PRESIDENCIA_NORMATIVA
+    ACTUALICESE
+    ASUNTOS_LEGALES
+    SUIN_JURISCOL
+    AMBITO_JURIDICO
+    DIARIO_OFICIAL
+    CORTE_CONST_COMUNICADOS
+}
+
+enum LegalUpdateType {
+    LAW
+    DECREE
+    RESOLUTION
+    CIRCULAR
+    RULING
+    JURISPRUDENCE
+    NEWS
+    OTHER
+}
+
 // USUARIO Y AUTENTICACION
 model User {
     id            String    @id @default(uuid()) @map("UID_USER")
@@ -415,6 +438,7 @@ model LegalBranch {
     documents        Document[]
     legalProcesses   LegalProcess[]
     libraryDocuments LibraryDocument[]
+    legalUpdates     LegalUpdate[]
 
     @@index([slug])
     @@index([firmId])
@@ -886,4 +910,45 @@ model LibraryChunk {
 
     @@index([documentId])
     @@map("LIBRARY_CHUNK")
+}
+
+// ACTUALIZACIONES LEGALES ("periodico legal") — contenido global, solo lectura
+model LegalUpdate {
+    id          String            @id @default(uuid()) @map("UID_LEGAL_UPDATE")
+    numId       Int               @default(autoincrement()) @map("NUM_ID_LEGAL_UPDATE")
+    source      LegalUpdateSource @map("STR_SOURCE_LEGAL_UPDATE")
+    sourceLabel String            @map("STR_SOURCE_LABEL_LEGAL_UPDATE")
+    externalId  String            @map("STR_EXTERNAL_ID_LEGAL_UPDATE")
+    type        LegalUpdateType   @default(NEWS) @map("STR_TYPE_LEGAL_UPDATE")
+    title       String            @map("STR_TITLE_LEGAL_UPDATE")
+    summary     String?           @map("STR_SUMMARY_LEGAL_UPDATE")
+    url         String            @map("STR_URL_LEGAL_UPDATE")
+    category    String?           @map("STR_CATEGORY_LEGAL_UPDATE")
+    branchId    String?           @map("UID_LEGAL_BRANCH_LEGAL_UPDATE")
+    publishedAt DateTime          @map("DTM_PUBLISHED_AT_LEGAL_UPDATE")
+    createdAt   DateTime          @default(now()) @map("DTM_CREATED_AT")
+    updatedAt   DateTime          @updatedAt @map("DTM_UPDATED_AT")
+
+    branch LegalBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+    @@unique([source, externalId])
+    @@index([publishedAt])
+    @@index([source])
+    @@index([branchId])
+    @@map("LEGAL_UPDATE")
+}
+
+// SALUD / CURSOR DE INGESTA POR FUENTE
+model LegalUpdateSourceRun {
+    id           String            @id @default(uuid()) @map("UID_LEGAL_UPDATE_SOURCE_RUN")
+    source       LegalUpdateSource @unique @map("STR_SOURCE_LEGAL_UPDATE_SOURCE_RUN")
+    lastRunAt    DateTime?         @map("DTM_LAST_RUN_AT_LEGAL_UPDATE_SOURCE_RUN")
+    lastOkAt     DateTime?         @map("DTM_LAST_OK_AT_LEGAL_UPDATE_SOURCE_RUN")
+    lastError    String?           @map("STR_LAST_ERROR_LEGAL_UPDATE_SOURCE_RUN")
+    lastCursor   String?           @map("STR_LAST_CURSOR_LEGAL_UPDATE_SOURCE_RUN")
+    itemsLastRun Int               @default(0) @map("NUM_ITEMS_LAST_RUN_LEGAL_UPDATE_SOURCE_RUN")
+    createdAt    DateTime          @default(now()) @map("DTM_CREATED_AT")
+    updatedAt    DateTime          @updatedAt @map("DTM_UPDATED_AT")
+
+    @@map("LEGAL_UPDATE_SOURCE_RUN")
 }
