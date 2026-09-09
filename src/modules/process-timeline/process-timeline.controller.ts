@@ -12,9 +12,10 @@ import {
     UploadedFile,
     UseInterceptors,
 } from '@nestjs/common';
-import {FileInterceptor} from '@nestjs/platform-express';
 import {ApiConsumes, ApiHeader, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
+import {Throttle} from '@nestjs/throttler';
 import {IsEnum} from 'class-validator';
+import {buildUploadInterceptor} from '../../utils/storage/upload.interceptor';
 import {ProcessTimelineService} from './process-timeline.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from '../firm/decorators/firm-id.decorator';
@@ -125,8 +126,9 @@ export class ProcessTimelineController
 
     @Post(':stageId/comments/:commentId/attachments')
     @Permission('processes:edit', 'Editar procesos legales')
+    @Throttle({default: {limit: 30, ttl: 60_000}})
     @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(buildUploadInterceptor(10 * 1024 * 1024))
     @ApiOperation({summary: 'Adjuntar un documento a un comentario'})
     async uploadAttachment(
         @CurrentUser() user: LoggedUser,

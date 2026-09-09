@@ -1,13 +1,24 @@
 import {NestFactory} from '@nestjs/core';
+import {NestExpressApplication} from '@nestjs/platform-express';
 import {AppModule} from './app.module';
 import {Logger, ValidationPipe} from "@nestjs/common";
+import helmet from 'helmet';
 import {environmentVariables} from "./config";
 import {DocumentBuilder, SwaggerModule} from "@nestjs/swagger";
 
 async function bootstrap()
 {
     const logger = new Logger("LegalDocs Backend");
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+    app.set('trust proxy', 1);
+
+    app.use(helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+        hsts: {maxAge: 15_552_000, includeSubDomains: true},
+        referrerPolicy: {policy: 'no-referrer'},
+    }));
 
     const allowedOrigins = [
         // Local development

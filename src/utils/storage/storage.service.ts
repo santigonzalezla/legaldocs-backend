@@ -2,16 +2,16 @@ import {Injectable} from '@nestjs/common';
 import {
     S3Client,
     PutObjectCommand,
+    GetObjectCommand,
     DeleteObjectCommand,
     DeleteObjectsCommand,
     ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
+import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
 import {environmentVariables} from '../../config';
 import {PrismaService} from '../../modules/prisma/prisma.service';
 import {StorageObjectArea} from '../../../generated/prisma/client';
 
-// Metadatos para el libro mayor (StorageObject). Toda subida los aporta para que
-// el consumo por firma sea una sola query y la limpieza de huérfanos sea posible.
 export interface StorageObjectInput
 {
     firmId: string;
@@ -50,15 +50,15 @@ export class StorageService
         });
     }
 
-    // ─── I/O de R2 + libro mayor ─────────────────────────────────────────────
-
     async upload(key: string, buffer: Buffer, mimeType: string, meta: StorageObjectInput): Promise<string>
     {
+        const downloadName = key.split('/').pop() ?? 'archivo';
         await this.client.send(new PutObjectCommand({
-            Bucket:      this.bucket,
-            Key:         key,
-            Body:        buffer,
-            ContentType: mimeType,
+            Bucket:             this.bucket,
+            Key:                key,
+            Body:               buffer,
+            ContentType:        mimeType,
+            ContentDisposition: `attachment; filename="${downloadName}"`,
         }));
 
         await this.prisma.storageObject.create({
@@ -77,6 +77,25 @@ export class StorageService
 
         const encodedKey = key.split('/').map(encodeURIComponent).join('/');
         return `${environmentVariables.r2PublicUrl}/${encodedKey}`;
+    }
+
+    getSignedFileUrl(
+        key: string,
+        opts: {fileName?: string; mimeType?: string; expiresInSeconds?: number} = {},
+    ): Promise<string>
+    {
+        const downloadName = opts.fileName ?? key.split('/').pop() ?? 'archivo';
+
+        return getSignedUrl(
+            this.client,
+            new GetObjectCommand({
+                Bucket:                     this.bucket,
+                Key:                        key,
+                ResponseContentDisposition: `inline; filename="${downloadName}"`,
+                ...(opts.mimeType && {ResponseContentType: opts.mimeType}),
+            }),
+            {expiresIn: opts.expiresInSeconds ?? 600},
+        );
     }
 
     async delete(key: string): Promise<void>

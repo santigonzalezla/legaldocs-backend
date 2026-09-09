@@ -1,6 +1,7 @@
 import {Request} from 'express';
 import {Controller, Post, Body, Req, UseGuards, Get, Res, HttpCode, HttpStatus, Query} from '@nestjs/common';
 import {ApiTags, ApiOperation, ApiHeader} from '@nestjs/swagger';
+import {Throttle} from '@nestjs/throttler';
 import {Response} from 'express';
 import {AuthService} from './auth.service';
 import {RegisterDto} from './dto/register.dto';
@@ -19,6 +20,7 @@ import {OAuthProfile} from './strategies/google.strategy';
 import {environmentVariables} from '../../config';
 
 @ApiTags('Auth')
+@Throttle({default: {limit: 20, ttl: 60_000}})
 @Controller('auth')
 export class AuthController
 {
@@ -39,6 +41,7 @@ export class AuthController
     }
 
     @Public()
+    @Throttle({default: {limit: 6, ttl: 60_000}})
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Iniciar sesión'})

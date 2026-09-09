@@ -1,7 +1,8 @@
-import {Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, InternalServerErrorException} from '@nestjs/common';
+import {Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, HttpException, InternalServerErrorException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {StorageService} from '../../utils/storage/storage.service';
 import {buildStorageKey} from '../../utils/storage/storage-key.util';
+import {assertValidUpload} from '../../utils/storage/file-validation.util';
 import {EmbeddingService} from '../../utils/storage/embedding.service';
 import {UploadLibraryDocumentDto} from './dto/upload-library-document.dto';
 import {LibraryFiltersDto} from './dto/library-filters.dto';
@@ -10,14 +11,6 @@ import {StorageObjectArea} from '../../../generated/prisma/client';
 import * as mammoth from 'mammoth';
 import {randomUUID} from 'crypto';
 import * as pdfParse from 'pdf-parse';
-
-const ALLOWED_MIME_TYPES = [
-    'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain'
-];
-
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 @Injectable()
 export class LibraryService
@@ -35,16 +28,15 @@ export class LibraryService
 
     async upload(file: Express.Multer.File, dto: UploadLibraryDocumentDto, user: LoggedUser, firmId: string)
     {
-        this.logger.log(`upload → firmId=${firmId} user=${user.userId} file=${file.originalname} (${file.size}B)`);
         try {
-            if (!ALLOWED_MIME_TYPES.includes(file.mimetype))
-                throw new BadRequestException('Formato no permitido. Use PDF, DOCX o TXT.');
+            if (!file) throw new BadRequestException('Debes adjuntar un archivo');
 
-            if (file.size > MAX_FILE_SIZE)
-                throw new BadRequestException('El archivo no puede superar los 20MB.');
+            this.logger.log(`upload → firmId=${firmId} user=${user.userId} file=${file.originalname} (${file.size}B)`);
+
+            const {mime} = assertValidUpload(file, ['pdf', 'docx', 'txt']);
 
             const fileKey = buildStorageKey([firmId, 'biblioteca'], file.originalname);
-            const fileUrl = await this.storage.upload(fileKey, file.buffer, file.mimetype, {
+            const fileUrl = await this.storage.upload(fileKey, file.buffer, mime, {
                 firmId,
                 area:       StorageObjectArea.LIBRARY_DOCUMENT,
                 ownerType:  'firm',
@@ -67,17 +59,17 @@ export class LibraryService
                     fileUrl,
                     fileName:    file.originalname,
                     fileSize:    file.size,
-                    mimeType:    file.mimetype,
+                    mimeType:    mime,
                 },
                 include: {branch: {select: {id: true, name: true, color: true, icon: true, slug: true}}},
             });
 
             this.logger.log(`upload → documento creado id=${doc.id}, iniciando indexado async`);
-            this.indexDocument(doc.id, file.buffer, file.mimetype).catch(() => {});
+            this.indexDocument(doc.id, file.buffer, mime).catch(() => {});
 
             return doc;
         } catch (error) {
-            if (error instanceof BadRequestException) throw error;
+            if (error instanceof HttpException) throw error;
             this.logger.error('upload → error inesperado', error);
             throw new InternalServerErrorException('Error al subir el documento');
         }

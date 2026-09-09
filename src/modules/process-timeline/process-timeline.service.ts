@@ -11,6 +11,7 @@ import {FirmService} from '../firm/firm.service';
 import {ProcessTimelineReminderDispatcherService} from './process-timeline-reminder-dispatcher.service';
 import {StorageService} from '../../utils/storage/storage.service';
 import {buildStorageKey} from '../../utils/storage/storage-key.util';
+import {assertValidUpload} from '../../utils/storage/file-validation.util';
 import {ProcessTimelineAttachmentType, StorageObjectArea, TimelineStage} from '../../../generated/prisma/client';
 import {CreateTimelineStageDto} from './dto/create-timeline-stage.dto';
 import {UpdateTimelineStageDto} from './dto/update-timeline-stage.dto';
@@ -35,14 +36,6 @@ export const STAGE_ORDER: Record<TimelineStage, number> = {
     SENTENCIA:    5,
     RECURSO:      6,
 };
-
-const ALLOWED_MIME = [
-    'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'image/jpeg',
-    'image/png',
-];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 // remindAt del recordatorio: offset 0 = "ahora"; con anticipo requiere fecha de evento.
 const computeRemindAt = (commentDate: Date | null, offsetMinutes: number): Date =>
@@ -402,17 +395,15 @@ export class ProcessTimelineService
             const {process, stage, comment} = await this.findFirmComment(userId, processId, stageId, commentId, firmId);
 
             if (!file) throw new BadRequestException('Debes adjuntar un archivo');
-            if (!ALLOWED_MIME.includes(file.mimetype))
-                throw new BadRequestException('Formato no permitido. Use PDF, DOCX, JPG o PNG.');
-            if (file.size > MAX_FILE_SIZE)
-                throw new BadRequestException('El archivo no puede superar los 10MB.');
+
+            const {mime} = assertValidUpload(file, ['pdf', 'docx', 'jpeg', 'png']);
 
             const processRef = process.reference?.trim() || `proceso-${process.numId}`;
             const fileKey = buildStorageKey(
                 [process.firmId, 'procesos', processRef, 'linea-tiempo', `etapa-${stage.numId}-${stage.stage}`, `comentario-${comment.numId}`],
                 file.originalname,
             );
-            const fileUrl = await this.storage.upload(fileKey, file.buffer, file.mimetype, {
+            const fileUrl = await this.storage.upload(fileKey, file.buffer, mime, {
                 firmId:     process.firmId,
                 area:       StorageObjectArea.TIMELINE_ATTACHMENT,
                 ownerType:  'process_timeline_comment',
@@ -431,7 +422,7 @@ export class ProcessTimelineService
                     fileUrl,
                     fileName: file.originalname,
                     fileSize: file.size,
-                    mimeType: file.mimetype,
+                    mimeType: mime,
                 },
             });
 

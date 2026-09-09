@@ -3,6 +3,7 @@ import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {StorageService} from '../../utils/storage/storage.service';
 import {buildStorageKey} from '../../utils/storage/storage-key.util';
+import {assertValidUpload} from '../../utils/storage/file-validation.util';
 import {CreateClientDto} from './dto/create-client.dto';
 import {UpdateClientDto} from './dto/update-client.dto';
 import {ClientFiltersDto} from './dto/client-filters.dto';
@@ -249,17 +250,13 @@ export class ClientService
 
             if (!file) throw new BadRequestException('Debes adjuntar un archivo');
 
-            if (!['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'].includes(file.mimetype))
-                throw new BadRequestException('Formato no permitido. Use PDF, DOCX, JPG o PNG.');
-
-            if (file.size > 10 * 1024 * 1024) // 10MB
-                throw new BadRequestException('El archivo no puede superar los 10MB.');
+            const {mime} = assertValidUpload(file, ['pdf', 'docx', 'jpeg', 'png']);
 
             const fileKey = buildStorageKey(
                 [client.firmId, 'clientes', `cliente-${client.numId}`],
                 file.originalname,
             );
-            const fileUrl = await this.storage.upload(fileKey, file.buffer, file.mimetype, {
+            const fileUrl = await this.storage.upload(fileKey, file.buffer, mime, {
                 firmId:     client.firmId,
                 area:       StorageObjectArea.CLIENT_DOCUMENT,
                 ownerType:  'client',
@@ -278,7 +275,7 @@ export class ClientService
                     fileUrl,
                     fileName: file.originalname,
                     fileSize: file.size,
-                    mimeType: file.mimetype,
+                    mimeType: mime,
                 },
             });
 

@@ -4,6 +4,7 @@ import {FirmService} from '../firm/firm.service';
 import {ClientService} from '../client/client.service';
 import {StorageService} from '../../utils/storage/storage.service';
 import {buildStorageKey} from '../../utils/storage/storage-key.util';
+import {assertValidUpload} from '../../utils/storage/file-validation.util';
 import {ClientPickerOptionEntity} from '../client/entities/client-picker-option.entity';
 import {CreateProcessDto} from './dto/create-process.dto';
 import {UpdateProcessDto} from './dto/update-process.dto';
@@ -417,18 +418,14 @@ export class ProcessService
 
             if (!file) throw new BadRequestException('Debes adjuntar un archivo');
 
-            if (!['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'].includes(file.mimetype))
-                throw new BadRequestException('Formato no permitido. Use PDF, DOCX, JPG o PNG.');
-
-            if (file.size > 10 * 1024 * 1024) // 10MB
-                throw new BadRequestException('El archivo no puede superar los 10MB.');
+            const {mime} = assertValidUpload(file, ['pdf', 'docx', 'jpeg', 'png']);
 
             const processRef = process.reference?.trim() || `proceso-${process.numId}`;
             const fileKey = buildStorageKey(
                 [process.firmId, 'procesos', processRef, 'adjuntos'],
                 file.originalname,
             );
-            const fileUrl = await this.storage.upload(fileKey, file.buffer, file.mimetype, {
+            const fileUrl = await this.storage.upload(fileKey, file.buffer, mime, {
                 firmId:     process.firmId,
                 area:       StorageObjectArea.PROCESS_DOCUMENT,
                 ownerType:  'legal_process',
@@ -447,7 +444,7 @@ export class ProcessService
                     fileUrl,
                     fileName: file.originalname,
                     fileSize: file.size,
-                    mimeType: file.mimetype,
+                    mimeType: mime,
                 },
             });
 

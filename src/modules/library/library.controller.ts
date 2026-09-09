@@ -21,8 +21,9 @@ class AssignBranchDto
     @ApiProperty({required: false, nullable: true})
     branchId: string | null;
 }
-import {FileInterceptor} from '@nestjs/platform-express';
+import {Throttle} from '@nestjs/throttler';
 import {ApiBearerAuth, ApiConsumes, ApiTags} from '@nestjs/swagger';
+import {buildUploadInterceptor} from '../../utils/storage/upload.interceptor';
 import {LibraryService} from './library.service';
 import {UploadLibraryDocumentDto} from './dto/upload-library-document.dto';
 import {LibraryFiltersDto} from './dto/library-filters.dto';
@@ -39,8 +40,9 @@ export class LibraryController
 
     @Post('documents')
     @Permission('library:create', 'Subir documentos a la biblioteca')
+    @Throttle({default: {limit: 30, ttl: 60_000}})
     @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(buildUploadInterceptor(20 * 1024 * 1024))
     upload(@UploadedFile() file: Express.Multer.File, @Body() dto: UploadLibraryDocumentDto, @CurrentUser() user: LoggedUser, @Headers('x-firm-id') firmId: string)
     {
         return this.libraryService.upload(file, dto, user, firmId);

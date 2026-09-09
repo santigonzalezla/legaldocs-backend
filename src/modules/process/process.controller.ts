@@ -1,5 +1,6 @@
 import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UploadedFile, UseInterceptors} from '@nestjs/common';
-import {FileInterceptor} from '@nestjs/platform-express';
+import {Throttle} from '@nestjs/throttler';
+import {buildUploadInterceptor} from '../../utils/storage/upload.interceptor';
 import {ApiConsumes, ApiHeader, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
 import {IsEnum} from 'class-validator';
 import {ProcessService} from './process.service';
@@ -137,8 +138,9 @@ export class ProcessController
 
     @Post(':id/documents')
     @Permission('processes:edit', 'Editar procesos legales')
+    @Throttle({default: {limit: 30, ttl: 60_000}})
     @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(buildUploadInterceptor(10 * 1024 * 1024))
     @ApiOperation({summary: 'Adjuntar un documento a un proceso'})
     async uploadDocument(
         @CurrentUser() user: LoggedUser,

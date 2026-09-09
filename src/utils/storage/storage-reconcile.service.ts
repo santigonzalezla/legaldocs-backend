@@ -3,8 +3,7 @@ import {Cron, CronExpression} from '@nestjs/schedule';
 import {PrismaService} from '../../modules/prisma/prisma.service';
 import {StorageService} from './storage.service';
 
-// Compara, por firma, los bytes reales en R2 contra el libro mayor (StorageObject).
-// Sólo loguea el drift — no corrige. FirmPurgeService usa las 3AM, esto va a las 4AM.
+// Compara R2 vs StorageObject por firma y loguea el drift (no corrige).
 @Injectable()
 export class StorageReconcileService
 {
