@@ -1,5 +1,7 @@
-import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards} from '@nestjs/common';
-import {ApiHeader, ApiOperation, ApiQuery, ApiTags} from '@nestjs/swagger';
+import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors} from '@nestjs/common';
+import {Throttle} from '@nestjs/throttler';
+import {ApiConsumes, ApiHeader, ApiOperation, ApiQuery, ApiTags} from '@nestjs/swagger';
+import {buildUploadInterceptor} from '../../utils/storage/upload.interceptor';
 import {FirmService} from './firm.service';
 import {SelfSignupGuard} from '../auth/guards/self-signup.guard';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
@@ -72,6 +74,25 @@ export class FirmController
     async updateFirm(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Body() dto: UpdateFirmDto)
     {
         return this.firmService.updateFirm(user.userId, firmId, dto);
+    }
+
+    @Post('me/logo')
+    @Permission('firm_settings:edit', 'Editar datos de la firma')
+    @Throttle({default: {limit: 10, ttl: 60_000}})
+    @ApiConsumes('multipart/form-data')
+    @UseInterceptors(buildUploadInterceptor(2 * 1024 * 1024))
+    @ApiOperation({summary: 'Subir o reemplazar el logo del despacho'})
+    async uploadLogo(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @UploadedFile() file: Express.Multer.File)
+    {
+        return this.firmService.uploadLogo(user.userId, firmId, file);
+    }
+
+    @Delete('me/logo')
+    @Permission('firm_settings:edit', 'Editar datos de la firma')
+    @ApiOperation({summary: 'Eliminar el logo del despacho'})
+    async removeLogo(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined)
+    {
+        return this.firmService.removeLogo(user.userId, firmId);
     }
 
     @Delete('me')

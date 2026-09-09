@@ -1,5 +1,7 @@
-import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch} from '@nestjs/common';
-import {ApiOperation, ApiTags} from '@nestjs/swagger';
+import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch, Post, UploadedFile, UseInterceptors} from '@nestjs/common';
+import {Throttle} from '@nestjs/throttler';
+import {ApiConsumes, ApiOperation, ApiTags} from '@nestjs/swagger';
+import {buildUploadInterceptor} from '../../utils/storage/upload.interceptor';
 import {UserService} from './user.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {LoggedUser} from '../../interfaces/LoggedUser';
@@ -26,6 +28,23 @@ export class UserController
     async updateProfile(@CurrentUser() user: LoggedUser, @Body() dto: UpdateProfileDto)
     {
         return this.userService.updateProfile(user.userId, dto);
+    }
+
+    @Post('me/avatar')
+    @Throttle({default: {limit: 10, ttl: 60_000}})
+    @ApiConsumes('multipart/form-data')
+    @UseInterceptors(buildUploadInterceptor(2 * 1024 * 1024))
+    @ApiOperation({summary: 'Subir o reemplazar la foto de perfil'})
+    async uploadAvatar(@CurrentUser() user: LoggedUser, @UploadedFile() file: Express.Multer.File)
+    {
+        return this.userService.uploadAvatar(user.userId, file);
+    }
+
+    @Delete('me/avatar')
+    @ApiOperation({summary: 'Eliminar la foto de perfil'})
+    async removeAvatar(@CurrentUser() user: LoggedUser)
+    {
+        return this.userService.removeAvatar(user.userId);
     }
 
     @Patch('me/password')

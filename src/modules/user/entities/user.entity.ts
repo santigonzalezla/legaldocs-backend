@@ -15,6 +15,7 @@ export class UserEntity implements User
     bio: string | null;
     hourlyRate: number | null;
     avatarUrl: string | null;
+    avatarKey: string | null;
     cloudPublicId: string | null;
     lastLoginAt: Date | null;
     deletedAt: Date | null;

@@ -15,6 +15,7 @@ import {PrismaClientExceptionFilter} from './filters/prisma_client_exception.fil
 import {MulterExceptionFilter} from './filters/multer_exception.filter';
 import {UserModule} from './modules/user/user.module';
 import {FirmModule} from './modules/firm/firm.module';
+import {FilesModule} from './modules/files/files.module';
 import {DocumentModule} from './modules/document/document.module';
 import {TemplateModule} from './modules/template/template.module';
 import {SignatureModule} from './modules/signature/signature.module';
@@ -41,6 +42,7 @@ import {PermissionsModule} from './modules/permissions/permissions.module';
         AuthModule,
         UserModule,
         FirmModule,
+        FilesModule,
         DocumentModule,
         TemplateModule,
         SignatureModule,

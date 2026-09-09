@@ -11,6 +11,9 @@ import {
 } from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {MailService} from '../../utils/mail/mail.service';
+import {StorageService} from '../../utils/storage/storage.service';
+import {assertValidUpload} from '../../utils/storage/file-validation.util';
+import {buildStorageKey} from '../../utils/storage/storage-key.util';
 import {environmentVariables} from '../../config';
 import {FirmRoleSeederService} from '../permissions/services/firm-role-seeder.service';
 import {CreateFirmDto} from './dto/create-firm.dto';
@@ -25,13 +28,6 @@ import {FirmSpecialtyEntity} from './entities/firm-specialty.entity';
 import {Firm, FirmMemberRole, FirmMemberStatus, FirmRole} from '../../../generated/prisma/client';
 import {Prisma} from '../../../generated/prisma/client';
 
-// include compartido para que las filas de miembro devueltas por inviteMember
-// tengan la misma forma que las de getMembers (el frontend refresca la lista con ese shape).
-const MEMBER_INCLUDE = {
-    user:     {select: {firstName: true, lastName: true, email: true, phone: true, hourlyRate: true}},
-    firmRole: {select: {id: true, name: true, slug: true}},
-} as const;
-
 @Injectable()
 export class FirmService
 {
@@ -40,7 +36,8 @@ export class FirmService
     constructor(
         private readonly prisma: PrismaService,
         private readonly mailService: MailService,
-        private readonly firmRoleSeeder: FirmRoleSeederService
+        private readonly firmRoleSeeder: FirmRoleSeederService,
+        private readonly storage: StorageService,
     ) {}
 
     async getMyFirms(userId: string): Promise<Array<FirmEntity & { role: FirmMemberRole; isOwner: boolean }>>
@@ -213,6 +210,48 @@ export class FirmService
         }
     }
 
+    async uploadLogo(userId: string, firmId: string | undefined, file: Express.Multer.File): Promise<FirmEntity>
+    {
+        try {
+            const firm = await this.findUserFirm(userId, firmId);
+            await this.assertCanManage(firm, userId);
+
+            const {mime} = assertValidUpload(file, ['png', 'jpeg']);
+            const key = buildStorageKey([firm.id, 'logo'], file.originalname);
+
+            await this.storage.putImage(key, file.buffer, mime);
+
+            if (firm.logoKey && firm.logoKey !== key)
+                await this.storage.delete(firm.logoKey).catch(() => undefined);
+
+            return this.prisma.firm.update({where: {id: firm.id}, data: {logoKey: key}});
+        } catch (error) {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`uploadLogo → failed firmId=${firmId}`, error as Error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async removeLogo(userId: string, firmId: string | undefined): Promise<FirmEntity>
+    {
+        try {
+            const firm = await this.findUserFirm(userId, firmId);
+            await this.assertCanManage(firm, userId);
+
+            if (firm.logoKey)
+            {
+                await this.storage.delete(firm.logoKey).catch(() => undefined);
+                return this.prisma.firm.update({where: {id: firm.id}, data: {logoKey: null}});
+            }
+
+            return firm;
+        } catch (error) {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`removeLogo → failed firmId=${firmId}`, error as Error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
     // Eliminación lógica: oculta la firma y todos sus datos (documentos, plantillas,
     // clientes, procesos, etc. quedan inaccesibles porque todo se resuelve a través
     // de la firma). Recuperable durante 30 días; luego FirmPurgeService la borra
@@ -294,7 +333,7 @@ export class FirmService
             return this.prisma.firmMember.findMany({
                 where: {firmId: firm.id, ...(isPartner !== undefined && {isPartner})},
                 include: {
-                    user:     {select: {firstName: true, lastName: true, email: true, phone: true, hourlyRate: true}},
+                    user:     {select: {id: true, firstName: true, lastName: true, email: true, phone: true, hourlyRate: true, avatarKey: true}},
                     firmRole: {select: {id: true, name: true, slug: true}},
                 },
                 orderBy: {createdAt: 'asc'}
@@ -351,7 +390,10 @@ export class FirmService
                             inviteToken: null,
                             inviteExpiresAt: null
                         },
-                        include: MEMBER_INCLUDE
+                        include: {
+                            user:     {select: {id: true, firstName: true, lastName: true, email: true, phone: true, hourlyRate: true, avatarKey: true}},
+                            firmRole: {select: {id: true, name: true, slug: true}},
+                        }
                     })
                     : await this.prisma.firmMember.create({
                         data: {
@@ -364,7 +406,10 @@ export class FirmService
                             joinedAt: new Date(),
                             inviteEmail: dto.email
                         },
-                        include: MEMBER_INCLUDE
+                        include: {
+                            user:     {select: {id: true, firstName: true, lastName: true, email: true, phone: true, hourlyRate: true, avatarKey: true}},
+                            firmRole: {select: {id: true, name: true, slug: true}},
+                        }
                     });
 
                 this.mailService.sendFirmAddedEmail(dto.email, inviterName, firm.name, loginUrl)
@@ -408,7 +453,10 @@ export class FirmService
                         joinedAt: new Date(),
                         inviteEmail: dto.email
                     },
-                    include: MEMBER_INCLUDE
+                    include: {
+                        user:     {select: {id: true, firstName: true, lastName: true, email: true, phone: true, hourlyRate: true, avatarKey: true}},
+                        firmRole: {select: {id: true, name: true, slug: true}},
+                    }
                 });
             });
 

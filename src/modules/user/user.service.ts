@@ -1,6 +1,9 @@
 import * as argon2 from 'argon2';
 import {BadRequestException, HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
+import {StorageService} from '../../utils/storage/storage.service';
+import {assertValidUpload} from '../../utils/storage/file-validation.util';
+import {buildStorageKey} from '../../utils/storage/storage-key.util';
 import {UpdateProfileDto} from './dto/update-profile.dto';
 import {ChangePasswordDto} from './dto/change-password.dto';
 import {UpdateNotificationPrefsDto} from './dto/update-notification-prefs.dto';
@@ -14,7 +17,10 @@ export class UserService
 {
     private readonly logger = new Logger(UserService.name);
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly storage: StorageService,
+    ) {}
 
     async findMe(userId: string): Promise<UserEntity>
     {
@@ -65,6 +71,58 @@ export class UserService
         {
             if (error instanceof HttpException) throw error;
             this.logger.error(`updateProfile → failed userId=${userId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async uploadAvatar(userId: string, file: Express.Multer.File): Promise<UserEntity>
+    {
+        try
+        {
+            const user = await this.prisma.user.findUnique({where: {id: userId, deletedAt: null}});
+            if (!user) throw new NotFoundException('Usuario no encontrado');
+
+            const {mime} = assertValidUpload(file, ['png', 'jpeg']);
+            const key = buildStorageKey(['avatars', userId], file.originalname);
+
+            await this.storage.putImage(key, file.buffer, mime);
+
+            if (user.avatarKey && user.avatarKey !== key)
+                await this.storage.delete(user.avatarKey).catch(() => undefined);
+
+            await this.prisma.user.update({where: {id: userId}, data: {avatarKey: key}});
+
+            this.logger.log(`uploadAvatar → success userId=${userId}`);
+            return this.findMe(userId);
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`uploadAvatar → failed userId=${userId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async removeAvatar(userId: string): Promise<UserEntity>
+    {
+        try
+        {
+            const user = await this.prisma.user.findUnique({where: {id: userId, deletedAt: null}});
+            if (!user) throw new NotFoundException('Usuario no encontrado');
+
+            if (user.avatarKey)
+            {
+                await this.storage.delete(user.avatarKey).catch(() => undefined);
+                await this.prisma.user.update({where: {id: userId}, data: {avatarKey: null}});
+            }
+
+            this.logger.log(`removeAvatar → success userId=${userId}`);
+            return this.findMe(userId);
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`removeAvatar → failed userId=${userId}`, error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }

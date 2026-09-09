@@ -79,6 +79,20 @@ export class StorageService
         return `${environmentVariables.r2PublicUrl}/${encodedKey}`;
     }
 
+    // Imágenes de identidad (avatar de usuario, logo de firma): no entran al libro
+    // mayor StorageObject porque no son documentos con cuota por firma.
+    async putImage(key: string, buffer: Buffer, mimeType: string): Promise<void>
+    {
+        await this.client.send(new PutObjectCommand({
+            Bucket:            this.bucket,
+            Key:               key,
+            Body:              buffer,
+            ContentType:       mimeType,
+            ContentDisposition: 'inline',
+            CacheControl:      'public, max-age=3600',
+        }));
+    }
+
     getSignedFileUrl(
         key: string,
         opts: {fileName?: string; mimeType?: string; expiresInSeconds?: number} = {},
