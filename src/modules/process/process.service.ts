@@ -1,7 +1,9 @@
-import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
+import {BadRequestException, HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
 import {ClientService} from '../client/client.service';
+import {StorageService} from '../../utils/storage/storage.service';
+import {buildStorageKey} from '../../utils/storage/storage-key.util';
 import {ClientPickerOptionEntity} from '../client/entities/client-picker-option.entity';
 import {CreateProcessDto} from './dto/create-process.dto';
 import {UpdateProcessDto} from './dto/update-process.dto';
@@ -10,8 +12,10 @@ import {AddProcessTemplateDto} from './dto/add-process-template.dto';
 import {LegalProcessEntity, LegalProcessWithEntriesEntity} from './entities/legal-process.entity';
 import {ProcessTemplateEntity} from './entities/process-template.entity';
 import {ProcessValueEntryEntity} from './entities/process-value-entry.entity';
+import {ProcessDocumentEntity} from './entities/process-document.entity';
 import {CreateProcessValueEntryDto} from './dto/create-process-value-entry.dto';
 import {Paginated} from '../../interfaces/Paginated';
+import {ProcessDocumentType, StorageObjectArea} from '../../../generated/prisma/client';
 
 @Injectable()
 export class ProcessService
@@ -22,6 +26,7 @@ export class ProcessService
         private readonly prisma: PrismaService,
         private readonly firmService: FirmService,
         private readonly clientService: ClientService,
+        private readonly storage: StorageService,
     ) {}
 
     // Composición entre módulos: la ruta vive en ProcessController (gateada por
@@ -74,6 +79,10 @@ export class ProcessService
                 ...(filters.clientId   && {clientId:   filters.clientId}),
                 ...(filters.branchId   && {branchId:   filters.branchId}),
                 ...(filters.assignedTo && {assignedTo: filters.assignedTo}),
+                ...(filters.categoryId           && {categoryId:           filters.categoryId}),
+                ...(filters.billingType          && {billingType:          filters.billingType}),
+                ...(filters.responsiblePartnerId && {responsiblePartnerId: filters.responsiblePartnerId}),
+                ...(filters.isProBono !== undefined && {isProBono: filters.isProBono}),
                 ...(filters.search && {
                     OR: [
                         {title:     {contains: filters.search, mode: 'insensitive' as const}},
@@ -83,7 +92,26 @@ export class ProcessService
             };
 
             const [data, total] = await this.prisma.$transaction([
-                this.prisma.legalProcess.findMany({where, orderBy: {createdAt: 'desc'}, skip, take: limit}),
+                this.prisma.legalProcess.findMany({
+                    where,
+                    orderBy: {createdAt: 'desc'},
+                    skip,
+                    take: limit,
+                    include: {
+                        client: {
+                            select: {
+                                id:             true,
+                                type:           true,
+                                firstName:      true,
+                                lastName:       true,
+                                companyName:    true,
+                                documentType:   true,
+                                documentNumber: true,
+                            },
+                        },
+                        assignee: {select: {id: true, firstName: true, lastName: true}},
+                    },
+                }),
                 this.prisma.legalProcess.count({where}),
             ]);
 
@@ -123,6 +151,10 @@ export class ProcessService
                             documentNumber: true,
                         },
                     },
+                    category:           {select: {id: true, name: true, slug: true}},
+                    responsiblePartner: {select: {id: true, user: {select: {firstName: true, lastName: true}}}},
+                    originator:         {select: {id: true, user: {select: {firstName: true, lastName: true}}}},
+                    billingResponsible: {select: {id: true, user: {select: {firstName: true, lastName: true}}}},
                 },
             }) as LegalProcessWithEntriesEntity | null;
 
@@ -354,5 +386,102 @@ export class ProcessService
         if (!process) throw new NotFoundException('Proceso no encontrado');
 
         return process;
+    }
+
+    // ─── DOCUMENTOS ADJUNTOS ──────────────────────────────────────────────────
+
+    async listDocuments(userId: string, firmId: string | undefined, processId: string): Promise<ProcessDocumentEntity[]>
+    {
+        try
+        {
+            await this.findFirmProcess(userId, firmId, processId);
+
+            return this.prisma.processDocument.findMany({
+                where:   {processId, deletedAt: null},
+                orderBy: {createdAt: 'desc'},
+            });
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`listDocuments → failed processId=${processId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async uploadDocument(userId: string, firmId: string | undefined, processId: string, file: Express.Multer.File, type: ProcessDocumentType): Promise<ProcessDocumentEntity>
+    {
+        try
+        {
+            const process = await this.findFirmProcess(userId, firmId, processId);
+
+            if (!file) throw new BadRequestException('Debes adjuntar un archivo');
+
+            if (!['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'].includes(file.mimetype))
+                throw new BadRequestException('Formato no permitido. Use PDF, DOCX, JPG o PNG.');
+
+            if (file.size > 10 * 1024 * 1024) // 10MB
+                throw new BadRequestException('El archivo no puede superar los 10MB.');
+
+            const processRef = process.reference?.trim() || `proceso-${process.numId}`;
+            const fileKey = buildStorageKey(
+                [process.firmId, 'procesos', processRef, 'adjuntos'],
+                file.originalname,
+            );
+            const fileUrl = await this.storage.upload(fileKey, file.buffer, file.mimetype, {
+                firmId:     process.firmId,
+                area:       StorageObjectArea.PROCESS_DOCUMENT,
+                ownerType:  'legal_process',
+                ownerId:    process.id,
+                uploadedBy: userId,
+                fileName:   file.originalname,
+                sizeBytes:  file.size,
+            });
+
+            const result = await this.prisma.processDocument.create({
+                data: {
+                    processId:  process.id,
+                    uploadedBy: userId,
+                    type,
+                    fileKey,
+                    fileUrl,
+                    fileName: file.originalname,
+                    fileSize: file.size,
+                    mimeType: file.mimetype,
+                },
+            });
+
+            this.logger.log(`uploadDocument → success processId=${processId} id=${result.id}`);
+            return result;
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`uploadDocument → failed processId=${processId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async removeDocument(userId: string, firmId: string | undefined, processId: string, documentId: string): Promise<{message: string}>
+    {
+        try
+        {
+            await this.findFirmProcess(userId, firmId, processId);
+
+            const doc = await this.prisma.processDocument.findFirst({where: {id: documentId, processId, deletedAt: null}});
+            if (!doc) throw new NotFoundException('Documento no encontrado');
+
+            await this.storage.delete(doc.fileKey);
+            await this.prisma.processDocument.update({where: {id: documentId}, data: {deletedAt: new Date()}});
+
+            this.logger.log(`removeDocument → success id=${documentId}`);
+            return {message: 'Documento eliminado correctamente'};
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`removeDocument → failed id=${documentId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
     }
 }

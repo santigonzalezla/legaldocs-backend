@@ -11,6 +11,7 @@ export class SubscriptionPlanEntity implements SubscriptionPlan
     maxDocuments: number | null;
     maxUsers: number | null;
     maxTemplates: number | null;
+    maxStorageBytes: number | null;
     maxAiTokensDaily: number | null;
     maxAiTokensWeekly: number | null;
     maxAiTokensMonthly: number | null;

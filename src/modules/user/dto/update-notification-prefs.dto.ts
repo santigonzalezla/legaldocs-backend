@@ -60,6 +60,15 @@ export class UpdateNotificationPrefsDto
     @IsBoolean()
     @IsOptional()
     @ApiProperty({
+        description: 'Notificación por email de los recordatorios de la línea de tiempo de procesos',
+        example: true,
+        required: false
+    })
+    emailProcessReminders?: boolean;
+
+    @IsBoolean()
+    @IsOptional()
+    @ApiProperty({
         description: 'Notificación en app al crear un nuevo documento',
         example: true,
         required: false

@@ -8,7 +8,8 @@ export type EmailTemplateName =
     | 'password-reset'
     | 'firm-invitation'
     | 'provisioned-invite'
-    | 'firm-added';
+    | 'firm-added'
+    | 'timeline-reminder';
 
 // Carga y compila los .hbs de ./templates (copiados a dist/ vía nest-cli assets),
 // los cachea y envuelve el contenido en el layout base.hbs. Centraliza todo el

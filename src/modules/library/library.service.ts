@@ -1,10 +1,12 @@
 import {Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, InternalServerErrorException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {StorageService} from '../../utils/storage/storage.service';
+import {buildStorageKey} from '../../utils/storage/storage-key.util';
 import {EmbeddingService} from '../../utils/storage/embedding.service';
 import {UploadLibraryDocumentDto} from './dto/upload-library-document.dto';
 import {LibraryFiltersDto} from './dto/library-filters.dto';
 import {LoggedUser} from '../../interfaces/LoggedUser';
+import {StorageObjectArea} from '../../../generated/prisma/client';
 import * as mammoth from 'mammoth';
 import {randomUUID} from 'crypto';
 import * as pdfParse from 'pdf-parse';
@@ -41,8 +43,16 @@ export class LibraryService
             if (file.size > MAX_FILE_SIZE)
                 throw new BadRequestException('El archivo no puede superar los 20MB.');
 
-            const fileKey = `library/${firmId}/${randomUUID()}-${file.originalname}`;
-            const fileUrl = await this.storage.upload(fileKey, file.buffer, file.mimetype);
+            const fileKey = buildStorageKey([firmId, 'biblioteca'], file.originalname);
+            const fileUrl = await this.storage.upload(fileKey, file.buffer, file.mimetype, {
+                firmId,
+                area:       StorageObjectArea.LIBRARY_DOCUMENT,
+                ownerType:  'firm',
+                ownerId:    firmId,
+                uploadedBy: user.userId,
+                fileName:   file.originalname,
+                sizeBytes:  file.size,
+            });
             this.logger.log(`upload → archivo subido a R2: ${fileKey}`);
 
             const doc = await this.prisma.libraryDocument.create({

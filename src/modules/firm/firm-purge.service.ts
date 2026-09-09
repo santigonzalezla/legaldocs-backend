@@ -1,16 +1,21 @@
 import {Injectable, Logger} from '@nestjs/common';
 import {Cron, CronExpression} from '@nestjs/schedule';
 import {PrismaService} from '../prisma/prisma.service';
+import {StorageService} from '../../utils/storage/storage.service';
 
 // Purga definitiva de las firmas cuyo plazo de recuperación (30 días) venció.
 // El borrado en cascada de documentos, plantillas, clientes, procesos, suscripción,
-// facturas, miembros y roles lo resuelve la BD vía onDelete: Cascade.
+// facturas, miembros y roles lo resuelve la BD vía onDelete: Cascade. Los objetos
+// de R2 no están en cascade, así que se limpian por prefijo antes de borrar la firma.
 @Injectable()
 export class FirmPurgeService
 {
     private readonly logger = new Logger(FirmPurgeService.name);
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly storage: StorageService,
+    ) {}
 
     @Cron(CronExpression.EVERY_DAY_AT_3AM)
     async purgeExpiredFirms(): Promise<void>
@@ -26,6 +31,9 @@ export class FirmPurgeService
         {
             try
             {
+                await this.storage.deleteFirmPrefix(firm.id).catch(error =>
+                    this.logger.warn(`purgeExpiredFirms → no se pudo limpiar R2 de ${firm.id}: ${error}`),
+                );
                 await this.prisma.firm.delete({where: {id: firm.id}});
                 this.logger.log(`purgeExpiredFirms → "${firm.name}" (${firm.id}) eliminada definitivamente`);
             }

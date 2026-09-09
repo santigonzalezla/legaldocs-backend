@@ -19,12 +19,15 @@ import {SubscriptionModule} from './modules/subscription/subscription.module';
 import {BranchModule} from './modules/branch/branch.module';
 import {ClientModule} from './modules/client/client.module';
 import {ProcessModule} from './modules/process/process.module';
+import {ProcessCategoryModule} from './modules/process-category/process-category.module';
+import {ProcessTimelineModule} from './modules/process-timeline/process-timeline.module';
 import {TimeEntryModule} from './modules/time-entry/time-entry.module';
 import {LibraryModule} from './modules/library/library.module';
 import {LegalUpdatesModule} from './modules/legal-updates/legal-updates.module';
 import {DashboardModule} from './modules/dashboard/dashboard.module';
 import {AiModule} from './modules/ai/ai.module';
 import {MailModule} from './utils/mail/mail.module';
+import {StorageModule} from './utils/storage/storage.module';
 import {PermissionsModule} from './modules/permissions/permissions.module';
 
 @Module({
@@ -41,12 +44,15 @@ import {PermissionsModule} from './modules/permissions/permissions.module';
         BranchModule,
         ClientModule,
         ProcessModule,
+        ProcessCategoryModule,
+        ProcessTimelineModule,
         TimeEntryModule,
         LibraryModule,
         LegalUpdatesModule,
         DashboardModule,
         AiModule,
         MailModule,
+        StorageModule,
         PermissionsModule
     ],
     providers: [

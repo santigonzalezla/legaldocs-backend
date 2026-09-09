@@ -1,7 +1,7 @@
 import {ApiProperty} from '@nestjs/swagger';
 import {Transform, Type} from 'class-transformer';
 import {IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min} from 'class-validator';
-import {ProcessStatus} from '../../../../generated/prisma/client';
+import {ProcessBillingType, ProcessStatus} from '../../../../generated/prisma/client';
 
 export class ProcessFiltersDto
 {
@@ -24,6 +24,27 @@ export class ProcessFiltersDto
     @IsOptional()
     @ApiProperty({description: 'Filtrar por miembro asignado', required: false})
     assignedTo?: string;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'Filtrar por categoría del proceso', required: false})
+    categoryId?: string;
+
+    @IsEnum(ProcessBillingType)
+    @IsOptional()
+    @ApiProperty({description: 'Filtrar por modalidad de cobro', required: false, enum: ProcessBillingType})
+    billingType?: ProcessBillingType;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'Filtrar por socio responsable', required: false})
+    responsiblePartnerId?: string;
+
+    @Transform(({value}) => value === 'true')
+    @IsBoolean()
+    @IsOptional()
+    @ApiProperty({description: 'Filtrar solo procesos pro bono', required: false})
+    isProBono?: boolean;
 
     @IsString()
     @IsOptional()

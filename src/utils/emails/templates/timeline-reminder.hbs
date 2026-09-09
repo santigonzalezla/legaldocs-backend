@@ -1,0 +1,19 @@
+<h2 style="margin:0 0 8px;color:#1f2937;font-size:22px;font-weight:700;">Recordatorio de proceso</h2>
+<p style="margin:0 0 8px;color:#6b7280;font-size:15px;line-height:1.6;">
+  Etapa <strong style="color:#1f2937;">{{stageLabel}}</strong>
+</p>
+<p style="margin:0 0 24px;color:#6b7280;font-size:14px;line-height:1.6;">
+  Proceso <strong style="color:#1f2937;">{{processLabel}}</strong> — {{dueText}}.
+</p>
+{{#if commentHtml}}
+<div style="margin:0 0 24px;padding:14px 16px;background:#f9fafb;border-radius:10px;color:#4b5563;font-size:14px;line-height:1.6;">
+  {{{commentHtml}}}
+</div>
+{{/if}}
+<a href="{{url}}" style="display:inline-block;background:#3b82f6;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:15px;font-weight:600;">
+  Abrir proceso
+</a>
+<p style="margin:28px 0 0;color:#6b7280;font-size:13px;line-height:1.6;padding-top:24px;border-top:1px solid #f3f4f6;">
+  Recibiste este correo porque hay un recordatorio configurado en un comentario de la línea de tiempo
+  del proceso. Podés desactivarlos desde tus preferencias de notificaciones en LegalDocs.
+</p>

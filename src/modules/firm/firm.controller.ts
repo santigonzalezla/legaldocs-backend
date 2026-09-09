@@ -10,6 +10,7 @@ import {CreateFirmDto} from './dto/create-firm.dto';
 import {UpdateFirmDto} from './dto/update-firm.dto';
 import {InviteMemberDto} from './dto/invite-member.dto';
 import {UpdateMemberDto} from './dto/update-member.dto';
+import {UpdateMemberProfileDto} from './dto/update-member-profile.dto';
 import {AddSpecialtyDto} from './dto/add-specialty.dto';
 
 @ApiTags('Firm')
@@ -93,9 +94,10 @@ export class FirmController
     @Get('me/members')
     @Permission('team:view', 'Ver miembros del equipo')
     @ApiOperation({summary: 'Listar miembros del despacho'})
-    async getMembers(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined)
+    @ApiQuery({name: 'isPartner', required: false, description: 'Filtrar solo socios (true) o no socios (false)'})
+    async getMembers(@CurrentUser() user: LoggedUser, @FirmId() firmId: string | undefined, @Query('isPartner') isPartner?: string)
     {
-        return this.firmService.getMembers(user.userId, firmId);
+        return this.firmService.getMembers(user.userId, firmId, isPartner === undefined ? undefined : isPartner === 'true');
     }
 
     @Post('me/members')
@@ -117,6 +119,19 @@ export class FirmController
     )
     {
         return this.firmService.updateMember(user.userId, firmId, memberId, dto);
+    }
+
+    @Patch('me/members/:memberId/profile')
+    @Permission('team:update-member', 'Cambiar rol de miembros del equipo')
+    @ApiOperation({summary: 'Actualizar nombre/apellido/teléfono de un miembro (solo ADMIN)'})
+    async updateMemberProfile(
+        @CurrentUser() user: LoggedUser,
+        @FirmId() firmId: string | undefined,
+        @Param('memberId') memberId: string,
+        @Body() dto: UpdateMemberProfileDto,
+    )
+    {
+        return this.firmService.updateMemberProfile(user.userId, firmId, memberId, dto);
     }
 
     @Post('me/members/accept')

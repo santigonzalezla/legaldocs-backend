@@ -1,7 +1,7 @@
 import {ApiProperty} from '@nestjs/swagger';
 import {Type} from 'class-transformer';
-import {IsDate, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, IsUUID} from 'class-validator';
-import {ProcessStatus} from '../../../../generated/prisma/client';
+import {IsBoolean, IsDate, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, IsUUID} from 'class-validator';
+import {ProcessBillingType, ProcessStatus} from '../../../../generated/prisma/client';
 
 export class CreateProcessDto
 {
@@ -67,4 +67,39 @@ export class CreateProcessDto
     @IsOptional()
     @ApiProperty({description: 'Valor inicial pactado del proceso en COP', example: 10000000, required: false})
     processValue?: number;
+
+    @IsEnum(ProcessBillingType)
+    @IsOptional()
+    @ApiProperty({description: 'Modalidad de cobro del proceso', enum: ProcessBillingType, required: false})
+    billingType?: ProcessBillingType;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'ID de la categoría/asunto del proceso (reutilizable entre procesos)', required: false})
+    categoryId?: string;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'ID del socio responsable del proceso', required: false})
+    responsiblePartnerId?: string;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'ID del miembro que originó el proceso', required: false})
+    originatorId?: string;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'ID del miembro responsable de la facturación', required: false})
+    billingResponsibleId?: string;
+
+    @IsBoolean()
+    @IsOptional()
+    @ApiProperty({description: 'Si el proceso es pro bono', required: false})
+    isProBono?: boolean;
+
+    @IsBoolean()
+    @IsOptional()
+    @ApiProperty({description: 'Si ya se realizó un cobro parcial del proceso', required: false})
+    hasPartialPayment?: boolean;
 }

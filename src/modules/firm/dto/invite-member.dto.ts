@@ -1,5 +1,5 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {IsEmail, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength} from 'class-validator';
+import {IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength} from 'class-validator';
 import {Transform} from 'class-transformer';
 
 export class InviteMemberDto
@@ -43,4 +43,13 @@ export class InviteMemberDto
         required: false,
     })
     lastName?: string;
+
+    @IsBoolean()
+    @IsOptional()
+    @ApiProperty({
+        description: 'Si el miembro invitado es socio/accionista de la firma',
+        example: false,
+        required: false,
+    })
+    isPartner?: boolean;
 }

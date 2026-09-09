@@ -1,5 +1,5 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {IsEnum, IsOptional, IsUUID} from 'class-validator';
+import {IsBoolean, IsEnum, IsOptional, IsUUID} from 'class-validator';
 import {FirmMemberStatus} from '../../../../generated/prisma/client';
 
 export class UpdateMemberDto
@@ -21,4 +21,12 @@ export class UpdateMemberDto
         required: false,
     })
     status?: FirmMemberStatus;
+
+    @IsBoolean()
+    @IsOptional()
+    @ApiProperty({
+        description: 'Si el miembro es socio/accionista de la firma',
+        required: false,
+    })
+    isPartner?: boolean;
 }

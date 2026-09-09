@@ -1,5 +1,7 @@
-import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query} from '@nestjs/common';
-import {ApiHeader, ApiOperation, ApiTags} from '@nestjs/swagger';
+import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UploadedFile, UseInterceptors} from '@nestjs/common';
+import {FileInterceptor} from '@nestjs/platform-express';
+import {ApiConsumes, ApiHeader, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
+import {IsEnum} from 'class-validator';
 import {ProcessService} from './process.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from '../firm/decorators/firm-id.decorator';
@@ -10,6 +12,14 @@ import {UpdateProcessDto} from './dto/update-process.dto';
 import {ProcessFiltersDto} from './dto/process-filters.dto';
 import {AddProcessTemplateDto} from './dto/add-process-template.dto';
 import {CreateProcessValueEntryDto} from './dto/create-process-value-entry.dto';
+import {ProcessDocumentType} from '../../../generated/prisma/client';
+
+class UploadProcessDocumentDto
+{
+    @IsEnum(ProcessDocumentType)
+    @ApiProperty({description: 'Tipo de documento adjunto', enum: ProcessDocumentType})
+    type: ProcessDocumentType;
+}
 
 @ApiTags('Process')
 @ApiHeader({name: 'X-Firm-Id', required: false, description: 'ID de la firma activa (selector de workspace)'})
@@ -115,5 +125,43 @@ export class ProcessController
     async removeValueEntry(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Param('entryId') entryId: string = '')
     {
         return this.processService.removeValueEntry(user.userId, firmId, id, entryId);
+    }
+
+    @Get(':id/documents')
+    @Permission('processes:view', 'Ver procesos legales')
+    @ApiOperation({summary: 'Listar documentos adjuntos de un proceso'})
+    async listDocuments(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
+    {
+        return this.processService.listDocuments(user.userId, firmId, id);
+    }
+
+    @Post(':id/documents')
+    @Permission('processes:edit', 'Editar procesos legales')
+    @ApiConsumes('multipart/form-data')
+    @UseInterceptors(FileInterceptor('file'))
+    @ApiOperation({summary: 'Adjuntar un documento a un proceso'})
+    async uploadDocument(
+        @CurrentUser() user: LoggedUser,
+        @FirmId() firmId: string | undefined,
+        @Param('id') id: string,
+        @UploadedFile() file: Express.Multer.File,
+        @Body() dto: UploadProcessDocumentDto,
+    )
+    {
+        return this.processService.uploadDocument(user.userId, firmId, id, file, dto.type);
+    }
+
+    @Delete(':id/documents/:documentId')
+    @Permission('processes:edit', 'Editar procesos legales')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({summary: 'Eliminar un documento adjunto de un proceso'})
+    async removeDocument(
+        @CurrentUser() user: LoggedUser,
+        @FirmId() firmId: string | undefined,
+        @Param('id') id: string,
+        @Param('documentId') documentId: string,
+    )
+    {
+        return this.processService.removeDocument(user.userId, firmId, id, documentId);
     }
 }

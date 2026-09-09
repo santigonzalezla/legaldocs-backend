@@ -194,6 +194,12 @@ model User {
     timeEntryParticipations TimeEntryParticipant[]   @relation("TimeEntryParticipations")
     createdValueEntries     ProcessValueEntry[]      @relation("ProcessValueEntryCreator")
     libraryDocuments        LibraryDocument[]
+    uploadedClientDocuments  ClientDocument[]  @relation("ClientDocumentUploader")
+    uploadedProcessDocuments ProcessDocument[] @relation("ProcessDocumentUploader")
+    createdTimelineStages        ProcessTimelineStage[]      @relation("ProcessTimelineStageCreator")
+    createdTimelineComments      ProcessTimelineComment[]    @relation("ProcessTimelineCommentCreator")
+    uploadedTimelineAttachments  ProcessTimelineAttachment[] @relation("ProcessTimelineAttachmentUploader")
+    createdTimelineReminders     ProcessTimelineReminder[]   @relation("ProcessTimelineReminderCreator")
 
     @@index([deletedAt])
     @@map("USER")
@@ -246,6 +252,7 @@ model NotificationPreferences {
     emailTeamInvite      Boolean  @default(true) @map("BOOL_EMAIL_TEAM_INVITE_NOTIF_PREFS")
     emailBilling         Boolean  @default(true) @map("BOOL_EMAIL_BILLING_NOTIF_PREFS")
     emailLegalUpdates    Boolean  @default(false) @map("BOOL_EMAIL_LEGAL_UPDATES_NOTIF_PREFS")
+    emailProcessReminders Boolean @default(true) @map("BOOL_EMAIL_PROCESS_REMINDERS_NOTIF_PREFS")
     inAppNewDocument     Boolean  @default(true) @map("BOOL_INAPP_NEW_DOCUMENT_NOTIF_PREFS")
     inAppDocumentShared  Boolean  @default(true) @map("BOOL_INAPP_DOCUMENT_SHARED_NOTIF_PREFS")
     inAppTeamActivity    Boolean  @default(true) @map("BOOL_INAPP_TEAM_ACTIVITY_NOTIF_PREFS")
@@ -312,6 +319,8 @@ model Firm {
     timeEntries      TimeEntry[]
     libraryDocuments LibraryDocument[]
     firmRoles        FirmRole[]
+    processCategories ProcessCategory[]
+    storageObjects   StorageObject[]
 
     @@index([deletedAt])
     @@map("FIRM")
@@ -334,6 +343,7 @@ model FirmMember {
     role            FirmMemberRole   @default(ASSISTANT) @map("STR_ROLE_FIRM_MEMBER")
     firmRoleId      String?          @map("UID_FIRM_ROLE")
     status          FirmMemberStatus @default(PENDING) @map("STR_STATUS_FIRM_MEMBER")
+    isPartner       Boolean          @default(false) @map("BOOL_IS_PARTNER_FIRM_MEMBER")
     inviteEmail     String?          @map("STR_INVITE_EMAIL_FIRM_MEMBER")
     inviteToken     String?          @map("STR_INVITE_TOKEN_FIRM_MEMBER")
     inviteExpiresAt DateTime?        @map("DTM_INVITE_EXPIRES_AT_FIRM_MEMBER")
@@ -345,6 +355,12 @@ model FirmMember {
     firm     Firm      @relation(fields: [firmId], references: [id], onDelete: Cascade)
     user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
     firmRole FirmRole? @relation(fields: [firmRoleId], references: [id], onDelete: Restrict)
+
+    responsibleForClients   Client[]       @relation("ClientResponsiblePartner")
+    responsibleForProcesses LegalProcess[] @relation("ProcessResponsiblePartner")
+    originatedProcesses     LegalProcess[] @relation("ProcessOriginator")
+    billingForProcesses     LegalProcess[] @relation("ProcessBillingResponsible")
+    responsibleForTimelineComments ProcessTimelineComment[] @relation("ProcessTimelineCommentResponsible")
 
     @@unique([firmId, userId])
     @@index([firmId])
@@ -579,6 +595,7 @@ model SubscriptionPlan {
     maxDocuments      Int?     @map("NUM_MAX_DOCUMENTS_PLAN")
     maxUsers          Int?     @map("NUM_MAX_USERS_PLAN")
     maxTemplates      Int?     @map("NUM_MAX_TEMPLATES_PLAN")
+    maxStorageBytes   Int?     @map("NUM_MAX_STORAGE_BYTES_PLAN")
     maxAiTokensDaily  Int?     @map("NUM_MAX_AI_TOKENS_DAILY_PLAN")
     maxAiTokensWeekly Int?     @map("NUM_MAX_AI_TOKENS_WEEKLY_PLAN")
     maxAiTokensMonthly Int?    @map("NUM_MAX_AI_TOKENS_MONTHLY_PLAN")
@@ -697,38 +714,149 @@ model Log {
     @@map("LOG")
 }
 
+enum ClientRegimeType {
+    SIMPLIFIED
+    ORDINARY
+    GREAT_TAXPAYER
+    VAT_RESPONSIBLE
+    VAT_NON_RESPONSIBLE
+}
+
+enum ClientDocumentType {
+    RUT
+    CHAMBER_OF_COMMERCE
+    ID_DOCUMENT
+    OTHER
+}
+
 // CLIENTES
 model Client {
-    id             String     @id @default(uuid()) @map("UID_CLIENT")
-    numId          Int        @unique @default(autoincrement()) @map("NUM_ID_CLIENT")
-    firmId         String     @map("UID_FIRM")
-    type           ClientType @map("STR_TYPE_CLIENT")
-    firstName      String?    @map("STR_FIRST_NAME_CLIENT")
-    lastName       String?    @map("STR_LAST_NAME_CLIENT")
-    companyName    String?    @map("STR_COMPANY_NAME_CLIENT")
-    documentType   String?    @map("STR_DOCUMENT_TYPE_CLIENT")
-    documentNumber String?    @map("STR_DOCUMENT_NUMBER_CLIENT")
-    email          String?    @map("STR_EMAIL_CLIENT")
-    phone          String?    @map("STR_PHONE_CLIENT")
-    address        String?    @map("STR_ADDRESS_CLIENT")
-    city           String?    @map("STR_CITY_CLIENT")
-    createdBy      String     @map("UID_CREATED_BY_CLIENT")
-    deletedAt      DateTime?  @map("DTM_DELETED_AT_CLIENT")
-    createdAt      DateTime   @default(now()) @map("DTM_CREATED_AT")
-    updatedAt      DateTime   @updatedAt @map("DTM_UPDATED_AT")
+    id                   String            @id @default(uuid()) @map("UID_CLIENT")
+    numId                Int               @unique @default(autoincrement()) @map("NUM_ID_CLIENT")
+    firmId               String            @map("UID_FIRM")
+    type                 ClientType        @map("STR_TYPE_CLIENT")
+    firstName            String?           @map("STR_FIRST_NAME_CLIENT")
+    lastName             String?           @map("STR_LAST_NAME_CLIENT")
+    companyName          String?           @map("STR_COMPANY_NAME_CLIENT")
+    documentType         String?           @map("STR_DOCUMENT_TYPE_CLIENT")
+    documentNumber       String?           @map("STR_DOCUMENT_NUMBER_CLIENT")
+    email                String?           @map("STR_EMAIL_CLIENT")
+    phone                String?           @map("STR_PHONE_CLIENT")
+    address              String?           @map("STR_ADDRESS_CLIENT")
+    city                 String?           @map("STR_CITY_CLIENT")
+    regimeType           ClientRegimeType? @map("STR_REGIME_TYPE_CLIENT")
+    sector               String?           @map("STR_SECTOR_CLIENT")
+    isBusinessGroup      Boolean           @default(false) @map("BOOL_IS_BUSINESS_GROUP_CLIENT")
+    responsiblePartnerId String?           @map("UID_RESPONSIBLE_PARTNER_CLIENT")
+    createdBy            String            @map("UID_CREATED_BY_CLIENT")
+    deletedAt            DateTime?         @map("DTM_DELETED_AT_CLIENT")
+    createdAt            DateTime          @default(now()) @map("DTM_CREATED_AT")
+    updatedAt            DateTime          @updatedAt @map("DTM_UPDATED_AT")
 
-    firm              Firm                     @relation(fields: [firmId], references: [id], onDelete: Cascade)
-    creator           User                     @relation("ClientCreator", fields: [createdBy], references: [id])
-    legalProcesses    LegalProcess[]
-    frequentTemplates ClientFrequentTemplate[]
+    firm               Firm                     @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    creator            User                     @relation("ClientCreator", fields: [createdBy], references: [id])
+    responsiblePartner FirmMember?              @relation("ClientResponsiblePartner", fields: [responsiblePartnerId], references: [id], onDelete: SetNull)
+    legalProcesses     LegalProcess[]
+    frequentTemplates  ClientFrequentTemplate[]
+    attachments        ClientDocument[]
 
     @@index([firmId])
     @@index([type])
     @@index([deletedAt])
+    @@index([responsiblePartnerId])
     @@map("CLIENT")
 }
 
+model ClientDocument {
+    id         String             @id @default(uuid()) @map("UID_CLIENT_DOCUMENT")
+    numId      Int                @default(autoincrement()) @map("NUM_ID_CLIENT_DOCUMENT")
+    clientId   String             @map("UID_CLIENT")
+    uploadedBy String             @map("UID_UPLOADED_BY_CLIENT_DOCUMENT")
+    type       ClientDocumentType @map("STR_TYPE_CLIENT_DOCUMENT")
+    fileKey    String             @map("STR_FILE_KEY_CLIENT_DOCUMENT")
+    fileUrl    String             @map("STR_FILE_URL_CLIENT_DOCUMENT")
+    fileName   String             @map("STR_FILE_NAME_CLIENT_DOCUMENT")
+    fileSize   Int                @map("NUM_FILE_SIZE_CLIENT_DOCUMENT")
+    mimeType   String             @map("STR_MIME_TYPE_CLIENT_DOCUMENT")
+    deletedAt  DateTime?          @map("DTM_DELETED_AT_CLIENT_DOCUMENT")
+    createdAt  DateTime           @default(now()) @map("DTM_CREATED_AT")
+    updatedAt  DateTime           @updatedAt @map("DTM_UPDATED_AT")
+
+    client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+    uploader User   @relation("ClientDocumentUploader", fields: [uploadedBy], references: [id])
+
+    @@index([clientId])
+    @@index([type])
+    @@index([deletedAt])
+    @@map("CLIENT_DOCUMENT")
+}
+
 // PROCESOS LEGALES
+enum ProcessBillingType {
+    FIXED
+    HOURLY
+    MILESTONES
+    STAGES
+}
+
+enum ProcessDocumentType {
+    PROPOSAL
+    CONTRACT
+    OTHER
+}
+
+enum TimelineStage {
+    DEMANDA
+    NOTIFICACION
+    CONTESTACION
+    AUDIENCIA
+    SENTENCIA
+    RECURSO
+}
+
+enum ProcessTimelineAttachmentType {
+    RULING
+    BRIEF
+    EVIDENCE
+    NOTIFICATION
+    DRAFT
+    OTHER
+}
+
+enum ReminderChannel {
+    EMAIL
+}
+
+enum ReminderStatus {
+    PENDING
+    SENT
+    FAILED
+    CANCELLED
+}
+
+model ProcessCategory {
+    id        String    @id @default(uuid()) @map("UID_PROCESS_CATEGORY")
+    numId     Int       @default(autoincrement()) @map("NUM_ID_PROCESS_CATEGORY")
+    firmId    String?   @map("UID_FIRM")
+    name      String    @map("STR_NAME_PROCESS_CATEGORY")
+    slug      String    @map("STR_SLUG_PROCESS_CATEGORY")
+    isSystem  Boolean   @default(false) @map("BOOL_IS_SYSTEM_PROCESS_CATEGORY")
+    isActive  Boolean   @default(true) @map("BOOL_IS_ACTIVE_PROCESS_CATEGORY")
+    sortOrder Int       @default(0) @map("NUM_SORT_ORDER_PROCESS_CATEGORY")
+    deletedAt DateTime? @map("DTM_DELETED_AT_PROCESS_CATEGORY")
+    createdAt DateTime  @default(now()) @map("DTM_CREATED_AT")
+    updatedAt DateTime  @updatedAt @map("DTM_UPDATED_AT")
+
+    firm      Firm?          @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    processes LegalProcess[]
+
+    @@index([slug])
+    @@index([firmId])
+    @@index([isSystem])
+    @@index([deletedAt])
+    @@map("PROCESS_CATEGORY")
+}
+
 model LegalProcess {
     id          String        @id @default(uuid()) @map("UID_LEGAL_PROCESS")
     numId       Int           @unique @default(autoincrement()) @map("NUM_ID_LEGAL_PROCESS")
@@ -743,29 +871,70 @@ model LegalProcess {
     counterpart String?       @map("STR_COUNTERPART_LEGAL_PROCESS")
     startDate   DateTime?     @map("DTM_START_DATE_LEGAL_PROCESS")
     endDate     DateTime?     @map("DTM_END_DATE_LEGAL_PROCESS")
-    assignedTo    String?       @map("UID_ASSIGNED_TO_LEGAL_PROCESS")
-    createdBy     String        @map("UID_CREATED_BY_LEGAL_PROCESS")
-    processValue  Float?        @map("DEC_PROCESS_VALUE_LEGAL_PROCESS")
+    assignedTo            String?             @map("UID_ASSIGNED_TO_LEGAL_PROCESS")
+    createdBy             String              @map("UID_CREATED_BY_LEGAL_PROCESS")
+    processValue          Float?              @map("DEC_PROCESS_VALUE_LEGAL_PROCESS")
+    billingType           ProcessBillingType? @map("STR_BILLING_TYPE_LEGAL_PROCESS")
+    categoryId            String?             @map("UID_PROCESS_CATEGORY")
+    responsiblePartnerId  String?             @map("UID_RESPONSIBLE_PARTNER_LEGAL_PROCESS")
+    originatorId          String?             @map("UID_ORIGINATOR_LEGAL_PROCESS")
+    billingResponsibleId  String?             @map("UID_BILLING_RESPONSIBLE_LEGAL_PROCESS")
+    isProBono             Boolean             @default(false) @map("BOOL_IS_PRO_BONO_LEGAL_PROCESS")
+    hasPartialPayment     Boolean             @default(false) @map("BOOL_HAS_PARTIAL_PAYMENT_LEGAL_PROCESS")
     deletedAt     DateTime?     @map("DTM_DELETED_AT_LEGAL_PROCESS")
     createdAt     DateTime      @default(now()) @map("DTM_CREATED_AT")
     updatedAt     DateTime      @updatedAt @map("DTM_UPDATED_AT")
 
-    firm         Firm                @relation(fields: [firmId], references: [id], onDelete: Cascade)
-    client       Client              @relation(fields: [clientId], references: [id])
-    branch       LegalBranch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
-    assignee     User?               @relation("ProcessAssignee", fields: [assignedTo], references: [id])
-    creator      User                @relation("ProcessCreator", fields: [createdBy], references: [id])
+    firm               Firm                @relation(fields: [firmId], references: [id], onDelete: Cascade)
+    client             Client              @relation(fields: [clientId], references: [id])
+    branch             LegalBranch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+    assignee           User?               @relation("ProcessAssignee", fields: [assignedTo], references: [id])
+    creator            User                @relation("ProcessCreator", fields: [createdBy], references: [id])
+    category           ProcessCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+    responsiblePartner FirmMember?         @relation("ProcessResponsiblePartner", fields: [responsiblePartnerId], references: [id], onDelete: SetNull)
+    originator         FirmMember?         @relation("ProcessOriginator", fields: [originatorId], references: [id], onDelete: SetNull)
+    billingResponsible FirmMember?         @relation("ProcessBillingResponsible", fields: [billingResponsibleId], references: [id], onDelete: SetNull)
     documents    Document[]
     templates    ProcessTemplate[]
     timeEntries  TimeEntry[]
     valueEntries ProcessValueEntry[]
+    attachments  ProcessDocument[]
+    timelineStages    ProcessTimelineStage[]
+    timelineComments  ProcessTimelineComment[]
+    timelineReminders ProcessTimelineReminder[]
 
     @@index([firmId])
     @@index([clientId])
     @@index([status])
     @@index([assignedTo])
     @@index([deletedAt])
+    @@index([categoryId])
+    @@index([responsiblePartnerId])
     @@map("LEGAL_PROCESS")
+}
+
+model ProcessDocument {
+    id         String              @id @default(uuid()) @map("UID_PROCESS_DOCUMENT")
+    numId      Int                 @default(autoincrement()) @map("NUM_ID_PROCESS_DOCUMENT")
+    processId  String              @map("UID_LEGAL_PROCESS")
+    uploadedBy String              @map("UID_UPLOADED_BY_PROCESS_DOCUMENT")
+    type       ProcessDocumentType @map("STR_TYPE_PROCESS_DOCUMENT")
+    fileKey    String              @map("STR_FILE_KEY_PROCESS_DOCUMENT")
+    fileUrl    String              @map("STR_FILE_URL_PROCESS_DOCUMENT")
+    fileName   String              @map("STR_FILE_NAME_PROCESS_DOCUMENT")
+    fileSize   Int                 @map("NUM_FILE_SIZE_PROCESS_DOCUMENT")
+    mimeType   String              @map("STR_MIME_TYPE_PROCESS_DOCUMENT")
+    deletedAt  DateTime?           @map("DTM_DELETED_AT_PROCESS_DOCUMENT")
+    createdAt  DateTime            @default(now()) @map("DTM_CREATED_AT")
+    updatedAt  DateTime            @updatedAt @map("DTM_UPDATED_AT")
+
+    process  LegalProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+    uploader User         @relation("ProcessDocumentUploader", fields: [uploadedBy], references: [id])
+
+    @@index([processId])
+    @@index([type])
+    @@index([deletedAt])
+    @@map("PROCESS_DOCUMENT")
 }
 
 model ProcessTemplate {
@@ -846,6 +1015,107 @@ model ProcessValueEntry {
     @@index([processId])
     @@index([deletedAt])
     @@map("PROCESS_VALUE_ENTRY")
+}
+
+// LÍNEA DE TIEMPO DEL PROCESO — flujo secuencial de etapas jurídicas
+model ProcessTimelineStage {
+    id              String        @id @default(uuid()) @map("UID_PROCESS_TIMELINE_STAGE")
+    numId           Int           @default(autoincrement()) @map("NUM_ID_PROCESS_TIMELINE_STAGE")
+    processId       String        @map("UID_LEGAL_PROCESS")
+    firmId          String        @map("UID_FIRM")
+    stage           TimelineStage @map("STR_STAGE_PROCESS_TIMELINE_STAGE")
+    microStageLabel String?       @map("STR_MICRO_STAGE_LABEL_PROCESS_TIMELINE_STAGE")
+    createdBy       String        @map("UID_CREATED_BY_PROCESS_TIMELINE_STAGE")
+    deletedAt       DateTime?     @map("DTM_DELETED_AT_PROCESS_TIMELINE_STAGE")
+    createdAt       DateTime      @default(now()) @map("DTM_CREATED_AT")
+    updatedAt       DateTime      @updatedAt @map("DTM_UPDATED_AT")
+
+    process  LegalProcess            @relation(fields: [processId], references: [id], onDelete: Cascade)
+    creator  User                    @relation("ProcessTimelineStageCreator", fields: [createdBy], references: [id])
+    comments ProcessTimelineComment[]
+
+    @@index([processId])
+    @@index([deletedAt])
+    @@map("PROCESS_TIMELINE_STAGE")
+}
+
+// Observaciones / comentarios dentro de una etapa. Llevan fecha, responsable, adjuntos y recordatorios.
+model ProcessTimelineComment {
+    id            String    @id @default(uuid()) @map("UID_PROCESS_TIMELINE_COMMENT")
+    numId         Int       @default(autoincrement()) @map("NUM_ID_PROCESS_TIMELINE_COMMENT")
+    stageId       String    @map("UID_PROCESS_TIMELINE_STAGE")
+    processId     String    @map("UID_LEGAL_PROCESS")
+    body          String    @map("STR_BODY_PROCESS_TIMELINE_COMMENT")
+    // Fecha y hora del EVENTO. null = el evento es el propio registro (createdAt);
+    // con valor = evento futuro agendado.
+    commentDate   DateTime? @map("DTM_COMMENT_DATE_PROCESS_TIMELINE_COMMENT")
+    responsibleId String?   @map("UID_RESPONSIBLE_PROCESS_TIMELINE_COMMENT")
+    createdBy     String    @map("UID_CREATED_BY_PROCESS_TIMELINE_COMMENT")
+    deletedAt     DateTime? @map("DTM_DELETED_AT_PROCESS_TIMELINE_COMMENT")
+    createdAt     DateTime  @default(now()) @map("DTM_CREATED_AT")
+    updatedAt     DateTime  @updatedAt @map("DTM_UPDATED_AT")
+
+    stage       ProcessTimelineStage       @relation(fields: [stageId], references: [id], onDelete: Cascade)
+    process     LegalProcess               @relation(fields: [processId], references: [id], onDelete: Cascade)
+    responsible FirmMember?                @relation("ProcessTimelineCommentResponsible", fields: [responsibleId], references: [id], onDelete: SetNull)
+    creator     User                       @relation("ProcessTimelineCommentCreator", fields: [createdBy], references: [id])
+    attachments ProcessTimelineAttachment[]
+    reminders   ProcessTimelineReminder[]
+
+    @@index([stageId])
+    @@index([processId])
+    @@index([deletedAt])
+    @@map("PROCESS_TIMELINE_COMMENT")
+}
+
+model ProcessTimelineAttachment {
+    id         String                        @id @default(uuid()) @map("UID_PROCESS_TIMELINE_ATTACHMENT")
+    numId      Int                           @default(autoincrement()) @map("NUM_ID_PROCESS_TIMELINE_ATTACHMENT")
+    commentId  String                        @map("UID_PROCESS_TIMELINE_COMMENT")
+    uploadedBy String                        @map("UID_UPLOADED_BY_PROCESS_TIMELINE_ATTACHMENT")
+    type       ProcessTimelineAttachmentType @default(OTHER) @map("STR_TYPE_PROCESS_TIMELINE_ATTACHMENT")
+    fileKey    String                        @map("STR_FILE_KEY_PROCESS_TIMELINE_ATTACHMENT")
+    fileUrl    String                        @map("STR_FILE_URL_PROCESS_TIMELINE_ATTACHMENT")
+    fileName   String                        @map("STR_FILE_NAME_PROCESS_TIMELINE_ATTACHMENT")
+    fileSize   Int                           @map("NUM_FILE_SIZE_PROCESS_TIMELINE_ATTACHMENT")
+    mimeType   String                        @map("STR_MIME_TYPE_PROCESS_TIMELINE_ATTACHMENT")
+    deletedAt  DateTime?                     @map("DTM_DELETED_AT_PROCESS_TIMELINE_ATTACHMENT")
+    createdAt  DateTime                      @default(now()) @map("DTM_CREATED_AT")
+    updatedAt  DateTime                      @updatedAt @map("DTM_UPDATED_AT")
+
+    comment  ProcessTimelineComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+    uploader User                   @relation("ProcessTimelineAttachmentUploader", fields: [uploadedBy], references: [id])
+
+    @@index([commentId])
+    @@index([deletedAt])
+    @@map("PROCESS_TIMELINE_ATTACHMENT")
+}
+
+model ProcessTimelineReminder {
+    id             String          @id @default(uuid()) @map("UID_PROCESS_TIMELINE_REMINDER")
+    numId          Int             @default(autoincrement()) @map("NUM_ID_PROCESS_TIMELINE_REMINDER")
+    commentId      String          @map("UID_PROCESS_TIMELINE_COMMENT")
+    processId      String          @map("UID_LEGAL_PROCESS")
+    channel        ReminderChannel @default(EMAIL) @map("STR_CHANNEL_PROCESS_TIMELINE_REMINDER")
+    offsetMinutes  Int             @map("NUM_OFFSET_MINUTES_PROCESS_TIMELINE_REMINDER")
+    remindAt       DateTime        @map("DTM_REMIND_AT_PROCESS_TIMELINE_REMINDER")
+    recipientEmail String          @map("STR_RECIPIENT_EMAIL_PROCESS_TIMELINE_REMINDER")
+    status         ReminderStatus  @default(PENDING) @map("STR_STATUS_PROCESS_TIMELINE_REMINDER")
+    sentAt         DateTime?       @map("DTM_SENT_AT_PROCESS_TIMELINE_REMINDER")
+    lastError      String?         @map("STR_LAST_ERROR_PROCESS_TIMELINE_REMINDER")
+    createdBy      String          @map("UID_CREATED_BY_PROCESS_TIMELINE_REMINDER")
+    deletedAt      DateTime?       @map("DTM_DELETED_AT_PROCESS_TIMELINE_REMINDER")
+    createdAt      DateTime        @default(now()) @map("DTM_CREATED_AT")
+    updatedAt      DateTime        @updatedAt @map("DTM_UPDATED_AT")
+
+    comment ProcessTimelineComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+    process LegalProcess           @relation(fields: [processId], references: [id], onDelete: Cascade)
+    creator User                   @relation("ProcessTimelineReminderCreator", fields: [createdBy], references: [id])
+
+    @@index([commentId])
+    @@index([status, remindAt])
+    @@index([deletedAt])
+    @@map("PROCESS_TIMELINE_REMINDER")
 }
 
 // PARTICIPANTES DE HORA COMPARTIDA
@@ -951,4 +1221,35 @@ model LegalUpdateSourceRun {
     updatedAt    DateTime          @updatedAt @map("DTM_UPDATED_AT")
 
     @@map("LEGAL_UPDATE_SOURCE_RUN")
+}
+
+// ALMACENAMIENTO (R2) — libro mayor central del consumo por firma
+enum StorageObjectArea {
+    PROCESS_DOCUMENT
+    TIMELINE_ATTACHMENT
+    CLIENT_DOCUMENT
+    LIBRARY_DOCUMENT
+}
+
+model StorageObject {
+    id         String            @id @default(uuid()) @map("UID_STORAGE_OBJECT")
+    numId      Int               @default(autoincrement()) @map("NUM_ID_STORAGE_OBJECT")
+    firmId     String            @map("UID_FIRM")
+    area       StorageObjectArea @map("STR_AREA_STORAGE_OBJECT")
+    ownerType  String            @map("STR_OWNER_TYPE_STORAGE_OBJECT")
+    ownerId    String            @map("STR_OWNER_ID_STORAGE_OBJECT")
+    fileKey    String            @unique @map("STR_FILE_KEY_STORAGE_OBJECT")
+    fileName   String            @map("STR_FILE_NAME_STORAGE_OBJECT")
+    sizeBytes  Int               @map("NUM_SIZE_BYTES_STORAGE_OBJECT")
+    mimeType   String            @map("STR_MIME_TYPE_STORAGE_OBJECT")
+    uploadedBy String            @map("UID_UPLOADED_BY_STORAGE_OBJECT")
+    deletedAt  DateTime?         @map("DTM_DELETED_AT_STORAGE_OBJECT")
+    createdAt  DateTime          @default(now()) @map("DTM_CREATED_AT")
+    updatedAt  DateTime          @updatedAt @map("DTM_UPDATED_AT")
+
+    firm Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+    @@index([firmId, deletedAt])
+    @@index([deletedAt])
+    @@map("STORAGE_OBJECT")
 }

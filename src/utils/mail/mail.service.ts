@@ -81,6 +81,20 @@ export class MailService
         });
     }
 
+    // ─── TIMELINE REMINDER ───────────────────────────────────────────────────────
+
+    async sendTimelineReminderEmail(
+        to: string,
+        ctx: {stageLabel: string; processLabel: string; dueText: string; commentHtml: string; url: string},
+    ): Promise<void>
+    {
+        await this.send({
+            to,
+            subject: `Recordatorio — ${ctx.processLabel}`,
+            html:    this.renderer.render('timeline-reminder', ctx),
+        });
+    }
+
     // ─── PRIVATE ──────────────────────────────────────────────────────────────────
 
     private async send(payload: {to: string; subject: string; html: string}): Promise<void>

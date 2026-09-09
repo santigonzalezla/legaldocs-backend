@@ -1,6 +1,6 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString} from 'class-validator';
-import {ClientType} from '../../../../generated/prisma/client';
+import {IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID} from 'class-validator';
+import {ClientRegimeType, ClientType} from '../../../../generated/prisma/client';
 
 export class UpdateClientDto
 {
@@ -56,4 +56,24 @@ export class UpdateClientDto
     @IsOptional()
     @ApiProperty({description: 'Ciudad', example: 'Bogotá', required: false})
     city?: string;
+
+    @IsEnum(ClientRegimeType)
+    @IsOptional()
+    @ApiProperty({description: 'Tipo de régimen tributario', enum: ClientRegimeType, required: false})
+    regimeType?: ClientRegimeType;
+
+    @IsString()
+    @IsOptional()
+    @ApiProperty({description: 'Sector económico', example: 'Construcción', required: false})
+    sector?: string;
+
+    @IsBoolean()
+    @IsOptional()
+    @ApiProperty({description: 'Si el cliente pertenece a un grupo empresarial', required: false})
+    isBusinessGroup?: boolean;
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'ID del miembro (socio) responsable del cliente', required: false})
+    responsiblePartnerId?: string;
 }

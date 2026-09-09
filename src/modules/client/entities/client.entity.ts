@@ -1,4 +1,10 @@
-import {Client, ClientType} from '../../../../generated/prisma/client';
+import {Client, ClientRegimeType, ClientType} from '../../../../generated/prisma/client';
+
+interface ClientResponsiblePartner
+{
+    id: string;
+    user: {firstName: string; lastName: string} | null;
+}
 
 export class ClientEntity implements Client
 {
@@ -15,6 +21,11 @@ export class ClientEntity implements Client
     phone: string | null;
     address: string | null;
     city: string | null;
+    regimeType: ClientRegimeType | null;
+    sector: string | null;
+    isBusinessGroup: boolean;
+    responsiblePartnerId: string | null;
+    responsiblePartner?: ClientResponsiblePartner | null;
     createdBy: string;
     deletedAt: Date | null;
     createdAt: Date;

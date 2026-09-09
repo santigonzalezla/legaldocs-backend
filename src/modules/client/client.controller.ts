@@ -1,5 +1,20 @@
-import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query} from '@nestjs/common';
-import {ApiHeader, ApiOperation, ApiTags} from '@nestjs/swagger';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UploadedFile,
+    UseInterceptors
+} from '@nestjs/common';
+import {FileInterceptor} from '@nestjs/platform-express';
+import {ApiConsumes, ApiHeader, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
+import {IsEnum} from 'class-validator';
 import {ClientService} from './client.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
 import {FirmId} from '../firm/decorators/firm-id.decorator';
@@ -8,6 +23,14 @@ import {LoggedUser} from '../../interfaces/LoggedUser';
 import {CreateClientDto} from './dto/create-client.dto';
 import {UpdateClientDto} from './dto/update-client.dto';
 import {ClientFiltersDto} from './dto/client-filters.dto';
+import {ClientDocumentType} from '../../../generated/prisma/client';
+
+class UploadClientDocumentDto
+{
+    @IsEnum(ClientDocumentType)
+    @ApiProperty({description: 'Tipo de documento adjunto', enum: ClientDocumentType})
+    type: ClientDocumentType;
+}
 
 @ApiTags('Client')
 @ApiHeader({name: 'X-Firm-Id', required: false, description: 'ID de la firma activa (selector de workspace)'})
@@ -63,5 +86,43 @@ export class ClientController
     async restore(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
     {
         return this.clientService.restore(user.userId, firmId, id);
+    }
+
+    @Get(':id/documents')
+    @Permission('clients:view', 'Ver clientes')
+    @ApiOperation({summary: 'Listar documentos adjuntos de un cliente'})
+    async listDocuments(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '')
+    {
+        return this.clientService.listDocuments(user.userId, firmId, id);
+    }
+
+    @Post(':id/documents')
+    @Permission('clients:edit', 'Editar clientes')
+    @ApiConsumes('multipart/form-data')
+    @UseInterceptors(FileInterceptor('file'))
+    @ApiOperation({summary: 'Adjuntar un documento a un cliente'})
+    async uploadDocument(
+        @CurrentUser() user: LoggedUser,
+        @FirmId() firmId: string | undefined,
+        @Param('id') id: string,
+        @UploadedFile() file: Express.Multer.File,
+        @Body() dto: UploadClientDocumentDto
+    )
+    {
+        return this.clientService.uploadDocument(user.userId, firmId, id, file, dto.type);
+    }
+
+    @Delete(':id/documents/:documentId')
+    @Permission('clients:edit', 'Editar clientes')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({summary: 'Eliminar un documento adjunto de un cliente'})
+    async removeDocument(
+        @CurrentUser() user: LoggedUser,
+        @FirmId() firmId: string | undefined,
+        @Param('id') id: string,
+        @Param('documentId') documentId: string
+    )
+    {
+        return this.clientService.removeDocument(user.userId, firmId, id, documentId);
     }
 }

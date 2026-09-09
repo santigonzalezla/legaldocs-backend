@@ -20,6 +20,7 @@
         "test:e2e": "jest --config ./test/jest-e2e.json",
         "seed": "ts-node prisma/seed.ts",
         "backfill:firm-roles": "ts-node prisma/backfill-firm-roles.ts",
+        "backfill:storage-objects": "ts-node prisma/backfill-storage-objects.ts",
         "poll:legal-updates": "ts-node scripts/poll-legal-updates.ts",
         "db:migrate": "prisma migrate dev",
         "db:generate": "prisma generate",

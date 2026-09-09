@@ -8,6 +8,7 @@ export class FirmMemberEntity implements FirmMember
     role: FirmMemberRole;
     firmRoleId: string | null;
     status: FirmMemberStatus;
+    isPartner: boolean;
     inviteEmail: string | null;
     inviteToken: string | null;
     inviteExpiresAt: Date | null;

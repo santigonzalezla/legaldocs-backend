@@ -10,6 +10,7 @@ export class NotificationPreferencesEntity implements NotificationPreferences
     emailTeamInvite: boolean;
     emailBilling: boolean;
     emailLegalUpdates: boolean;
+    emailProcessReminders: boolean;
     inAppNewDocument: boolean;
     inAppDocumentShared: boolean;
     inAppTeamActivity: boolean;

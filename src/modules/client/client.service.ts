@@ -1,13 +1,16 @@
-import {HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
+import {BadRequestException, HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import {FirmService} from '../firm/firm.service';
+import {StorageService} from '../../utils/storage/storage.service';
+import {buildStorageKey} from '../../utils/storage/storage-key.util';
 import {CreateClientDto} from './dto/create-client.dto';
 import {UpdateClientDto} from './dto/update-client.dto';
 import {ClientFiltersDto} from './dto/client-filters.dto';
 import {ClientEntity} from './entities/client.entity';
+import {ClientDocumentEntity} from './entities/client-document.entity';
 import {ClientPickerOptionEntity} from './entities/client-picker-option.entity';
 import {Paginated} from '../../interfaces/Paginated';
-import {ClientType} from '../../../generated/prisma/client';
+import {ClientDocumentType, ClientType, StorageObjectArea} from '../../../generated/prisma/client';
 
 @Injectable()
 export class ClientService
@@ -17,6 +20,7 @@ export class ClientService
     constructor(
         private readonly prisma: PrismaService,
         private readonly firmService: FirmService,
+        private readonly storage: StorageService,
     ) {}
 
     async create(userId: string, firmId?: string, dto: CreateClientDto = {} as CreateClientDto): Promise<ClientEntity>
@@ -31,6 +35,7 @@ export class ClientService
                     firmId:    firm.id,
                     createdBy: userId,
                 },
+                include: {responsiblePartner: {select: {id: true, user: {select: {firstName: true, lastName: true}}}}},
             });
 
             this.logger.log(`create → success firmId=${firm.id} id=${result.id}`);
@@ -69,7 +74,10 @@ export class ClientService
             };
 
             const [data, total] = await this.prisma.$transaction([
-                this.prisma.client.findMany({where, orderBy: {createdAt: 'desc'}, skip, take: limit}),
+                this.prisma.client.findMany({
+                    where, orderBy: {createdAt: 'desc'}, skip, take: limit,
+                    include: {responsiblePartner: {select: {id: true, user: {select: {firstName: true, lastName: true}}}}},
+                }),
                 this.prisma.client.count({where}),
             ]);
 
@@ -106,7 +114,10 @@ export class ClientService
         {
             await this.findFirmClient(userId, firmId, id);
 
-            const result = await this.prisma.client.update({where: {id}, data: dto});
+            const result = await this.prisma.client.update({
+                where: {id}, data: dto,
+                include: {responsiblePartner: {select: {id: true, user: {select: {firstName: true, lastName: true}}}}},
+            });
             this.logger.log(`update → success id=${id}`);
             return result;
         }
@@ -201,10 +212,107 @@ export class ClientService
                 firmId:    firm.id,
                 deletedAt: includeTrashed ? undefined : null,
             },
+            include: {responsiblePartner: {select: {id: true, user: {select: {firstName: true, lastName: true}}}}},
         });
 
         if (!client) throw new NotFoundException('Cliente no encontrado');
 
         return client;
+    }
+
+    // ─── DOCUMENTOS ADJUNTOS ──────────────────────────────────────────────────
+
+    async listDocuments(userId: string, firmId: string | undefined, clientId: string): Promise<ClientDocumentEntity[]>
+    {
+        try
+        {
+            await this.findFirmClient(userId, firmId, clientId);
+
+            return this.prisma.clientDocument.findMany({
+                where:   {clientId, deletedAt: null},
+                orderBy: {createdAt: 'desc'},
+            });
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`listDocuments → failed clientId=${clientId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async uploadDocument(userId: string, firmId: string | undefined, clientId: string, file: Express.Multer.File, type: ClientDocumentType): Promise<ClientDocumentEntity>
+    {
+        try
+        {
+            const client = await this.findFirmClient(userId, firmId, clientId);
+
+            if (!file) throw new BadRequestException('Debes adjuntar un archivo');
+
+            if (!['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'].includes(file.mimetype))
+                throw new BadRequestException('Formato no permitido. Use PDF, DOCX, JPG o PNG.');
+
+            if (file.size > 10 * 1024 * 1024) // 10MB
+                throw new BadRequestException('El archivo no puede superar los 10MB.');
+
+            const fileKey = buildStorageKey(
+                [client.firmId, 'clientes', `cliente-${client.numId}`],
+                file.originalname,
+            );
+            const fileUrl = await this.storage.upload(fileKey, file.buffer, file.mimetype, {
+                firmId:     client.firmId,
+                area:       StorageObjectArea.CLIENT_DOCUMENT,
+                ownerType:  'client',
+                ownerId:    client.id,
+                uploadedBy: userId,
+                fileName:   file.originalname,
+                sizeBytes:  file.size,
+            });
+
+            const result = await this.prisma.clientDocument.create({
+                data: {
+                    clientId:   client.id,
+                    uploadedBy: userId,
+                    type,
+                    fileKey,
+                    fileUrl,
+                    fileName: file.originalname,
+                    fileSize: file.size,
+                    mimeType: file.mimetype,
+                },
+            });
+
+            this.logger.log(`uploadDocument → success clientId=${clientId} id=${result.id}`);
+            return result;
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`uploadDocument → failed clientId=${clientId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async removeDocument(userId: string, firmId: string | undefined, clientId: string, documentId: string): Promise<{message: string}>
+    {
+        try
+        {
+            await this.findFirmClient(userId, firmId, clientId);
+
+            const doc = await this.prisma.clientDocument.findFirst({where: {id: documentId, clientId, deletedAt: null}});
+            if (!doc) throw new NotFoundException('Documento no encontrado');
+
+            await this.storage.delete(doc.fileKey);
+            await this.prisma.clientDocument.update({where: {id: documentId}, data: {deletedAt: new Date()}});
+
+            this.logger.log(`removeDocument → success id=${documentId}`);
+            return {message: 'Documento eliminado correctamente'};
+        }
+        catch (error)
+        {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`removeDocument → failed id=${documentId}`, error);
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
     }
 }

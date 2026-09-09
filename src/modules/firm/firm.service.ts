@@ -17,6 +17,7 @@ import {CreateFirmDto} from './dto/create-firm.dto';
 import {UpdateFirmDto} from './dto/update-firm.dto';
 import {InviteMemberDto} from './dto/invite-member.dto';
 import {UpdateMemberDto} from './dto/update-member.dto';
+import {UpdateMemberProfileDto} from './dto/update-member-profile.dto';
 import {AddSpecialtyDto} from './dto/add-specialty.dto';
 import {FirmEntity} from './entities/firm.entity';
 import {FirmMemberEntity} from './entities/firm-member.entity';
@@ -27,7 +28,7 @@ import {Prisma} from '../../../generated/prisma/client';
 // include compartido para que las filas de miembro devueltas por inviteMember
 // tengan la misma forma que las de getMembers (el frontend refresca la lista con ese shape).
 const MEMBER_INCLUDE = {
-    user:     {select: {firstName: true, lastName: true, email: true, phone: true}},
+    user:     {select: {firstName: true, lastName: true, email: true, phone: true, hourlyRate: true}},
     firmRole: {select: {id: true, name: true, slug: true}},
 } as const;
 
@@ -285,15 +286,15 @@ export class FirmService
         }
     }
 
-    async getMembers(userId: string, firmId?: string): Promise<FirmMemberEntity[]>
+    async getMembers(userId: string, firmId?: string, isPartner?: boolean): Promise<FirmMemberEntity[]>
     {
         try {
             const firm = await this.findUserFirm(userId, firmId);
 
             return this.prisma.firmMember.findMany({
-                where: {firmId: firm.id},
+                where: {firmId: firm.id, ...(isPartner !== undefined && {isPartner})},
                 include: {
-                    user:     {select: {firstName: true, lastName: true, email: true, phone: true}},
+                    user:     {select: {firstName: true, lastName: true, email: true, phone: true, hourlyRate: true}},
                     firmRole: {select: {id: true, name: true, slug: true}},
                 },
                 orderBy: {createdAt: 'asc'}
@@ -344,6 +345,7 @@ export class FirmService
                             status: FirmMemberStatus.ACTIVE,
                             firmRoleId: dto.firmRoleId,
                             role: this.legacyRoleForSlug(role.slug),
+                            isPartner: dto.isPartner ?? false,
                             joinedAt: existingMember.joinedAt ?? new Date(),
                             inviteEmail: dto.email,
                             inviteToken: null,
@@ -357,6 +359,7 @@ export class FirmService
                             userId: existingCred.userId,
                             firmRoleId: dto.firmRoleId,
                             role: this.legacyRoleForSlug(role.slug),
+                            isPartner: dto.isPartner ?? false,
                             status: FirmMemberStatus.ACTIVE,
                             joinedAt: new Date(),
                             inviteEmail: dto.email
@@ -400,6 +403,7 @@ export class FirmService
                         userId: user.id,
                         firmRoleId: dto.firmRoleId,
                         role: this.legacyRoleForSlug(role.slug),
+                        isPartner: dto.isPartner ?? false,
                         status: FirmMemberStatus.ACTIVE,
                         joinedAt: new Date(),
                         inviteEmail: dto.email
@@ -504,6 +508,32 @@ export class FirmService
             });
         } catch (error) {
             if (error instanceof HttpException) throw error;
+            throw new InternalServerErrorException('Error interno del servidor');
+        }
+    }
+
+    async updateMemberProfile(userId: string, firmId: string | undefined, memberId: string, dto: UpdateMemberProfileDto)
+    {
+        try {
+            const firm = await this.findUserFirm(userId, firmId);
+            await this.assertCanManage(firm, userId);
+
+            const member = await this.prisma.firmMember.findFirst({
+                where: {id: memberId, firmId: firm.id}
+            });
+
+            if (!member) throw new NotFoundException('Miembro no encontrado');
+            if (!member.userId) throw new BadRequestException('Este miembro todavía no tiene una cuenta asociada');
+            if (member.userId === userId) throw new BadRequestException('No puedes editar tu propio perfil desde acá');
+
+            return this.prisma.user.update({
+                where: {id: member.userId},
+                data: dto,
+                select: {id: true, firstName: true, lastName: true, phone: true, hourlyRate: true}
+            });
+        } catch (error) {
+            if (error instanceof HttpException) throw error;
+            this.logger.error(`updateMemberProfile → failed memberId=${memberId}`, error as Error);
             throw new InternalServerErrorException('Error interno del servidor');
         }
     }
