@@ -82,9 +82,9 @@ export class AuthController
     @Post('reset-password')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Restablecer contraseña con token'})
-    async resetPassword(@Body() dto: ResetPasswordDto)
+    async resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request)
     {
-        return this.authService.resetPassword(dto);
+        return this.authService.resetPassword(dto, req);
     }
 
     @Public()

@@ -266,7 +266,7 @@ export class AuthService
 
     // ─── RESET PASSWORD ───────────────────────────────────────────────────────────
 
-    async resetPassword(dto: ResetPasswordDto): Promise<{message: string}>
+    async resetPassword(dto: ResetPasswordDto, req: Request): Promise<LoginResult>
     {
         try
         {
@@ -283,11 +283,13 @@ export class AuthService
 
             await this.prisma.credentials.update({
                 where: {id: credentials.id},
-                data: {password: hashedPassword, resetToken: null, resetTokenExpiry: null},
+                data: {password: hashedPassword, resetToken: null, resetTokenExpiry: null, mustChangePassword: false},
             });
 
+            const tokens = await this.generateTokens(credentials.id, credentials.userId, credentials.email, req);
+
             this.logger.log(`resetPassword → success credentialsId=${credentials.id}`);
-            return {message: 'Contraseña restablecida correctamente'};
+            return {...tokens, mustChangePassword: false};
         }
         catch (error)
         {

@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
 import {Injectable, InternalServerErrorException, Logger} from '@nestjs/common';
+import {environmentVariables} from '../../config';
 
 export type EmailTemplateName =
     | 'verification'
@@ -24,7 +25,13 @@ export class EmailRenderer
     render(template: EmailTemplateName, context: Record<string, unknown> = {}): string
     {
         const body = this.compile(template)(context);
-        return this.compile('base')({...context, body, year: new Date().getFullYear()});
+        return this.compile('base')({
+            ...context,
+            body,
+            year:        new Date().getFullYear(),
+            logoUrl:     `${environmentVariables.r2PublicUrl}/email-assets/logo-email.png`,
+            fontBaseUrl: `${environmentVariables.r2PublicUrl}/email-assets/fonts`,
+        });
     }
 
     // El layout del build puede dejar los .hbs junto al JS compilado (dist/src/…)

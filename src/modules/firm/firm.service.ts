@@ -418,9 +418,15 @@ export class FirmService
                 return member as FirmMemberEntity;
             }
 
-            // ── Rama B: crear la cuenta con clave temporal ──
-            const tempPassword = this.generateTempPassword();
-            const hash         = await argon2.hash(tempPassword);
+            // ── Rama B: crear la cuenta con clave aleatoria + link de activación ──
+            // La clave nunca se revela: el usuario define la suya propia entrando por
+            // el link de activación, que reutiliza el mismo mecanismo de resetToken
+            // que "olvidé mi contraseña" (ver auth.service.ts resetPassword).
+            const tempPassword     = this.generateTempPassword();
+            const hash              = await argon2.hash(tempPassword);
+            const resetToken        = crypto.randomBytes(32).toString('hex');
+            const resetTokenExpiry  = new Date(Date.now() + 48 * 3_600_000);
+            const activationUrl     = `${environmentVariables.frontendUrl}/reset-password?token=${resetToken}`;
             const localPart    = dto.email.split('@')[0];
             const firstName    = dto.firstName?.trim() || localPart;
             const lastName     = dto.lastName?.trim()  || '—';
@@ -435,7 +441,9 @@ export class FirmService
                             email: dto.email,
                             password: hash,
                             mustChangePassword: true,
-                            isEmailVerified: true
+                            isEmailVerified: true,
+                            resetToken,
+                            resetTokenExpiry
                         }},
                         notificationPrefs: {create: {}},
                         securitySettings:  {create: {}}
@@ -462,10 +470,10 @@ export class FirmService
 
             let emailSent = true;
             try {
-                await this.mailService.sendProvisionedInviteEmail(dto.email, inviterName, firm.name, tempPassword, loginUrl);
+                await this.mailService.sendProvisionedInviteEmail(dto.email, inviterName, firm.name, activationUrl);
             } catch (e) {
                 emailSent = false;
-                this.logger.error(`sendProvisionedInviteEmail falló para ${dto.email} — clave temporal: ${tempPassword}`, e as Error);
+                this.logger.error(`sendProvisionedInviteEmail falló para ${dto.email} — link de activación: ${activationUrl}`, e as Error);
             }
 
             return {...member, emailSent} as FirmMemberEntity;

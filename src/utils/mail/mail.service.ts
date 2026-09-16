@@ -61,14 +61,13 @@ export class MailService
         email: string,
         inviterName: string,
         firmName: string,
-        tempPassword: string,
-        loginUrl: string,
+        activationUrl: string,
     ): Promise<void>
     {
         await this.send({
             to:      email,
-            subject: `${inviterName} te dio acceso a ${firmName} — LegalDocs`,
-            html:    this.renderer.render('provisioned-invite', {inviterName, firmName, email, tempPassword, loginUrl}),
+            subject: `Tu cuenta en LegalDocs está lista`,
+            html:    this.renderer.render('provisioned-invite', {inviterName, firmName, activationUrl}),
         });
     }
 

@@ -22,6 +22,7 @@
         "backfill:firm-roles": "ts-node prisma/backfill-firm-roles.ts",
         "backfill:storage-objects": "ts-node prisma/backfill-storage-objects.ts",
         "poll:legal-updates": "ts-node scripts/poll-legal-updates.ts",
+        "upload:email-assets": "ts-node scripts/upload-email-assets.ts",
         "db:migrate": "prisma migrate dev",
         "db:generate": "prisma generate",
         "db:studio": "prisma studio",

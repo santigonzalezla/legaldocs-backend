@@ -5,6 +5,11 @@ import {ProcessBillingType, ProcessStatus} from '../../../../generated/prisma/cl
 
 export class UpdateProcessDto
 {
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({description: 'ID del cliente asociado al proceso', example: 'uuid-v4', required: false})
+    clientId?: string;
+
     @IsString()
     @IsNotEmpty()
     @IsOptional()
