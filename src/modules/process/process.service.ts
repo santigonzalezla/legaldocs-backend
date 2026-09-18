@@ -6,6 +6,7 @@ import {StorageService} from '../../utils/storage/storage.service';
 import {buildStorageKey} from '../../utils/storage/storage-key.util';
 import {assertValidUpload} from '../../utils/storage/file-validation.util';
 import {ClientPickerOptionEntity} from '../client/entities/client-picker-option.entity';
+import {FirmMemberEntity} from '../firm/entities/firm-member.entity';
 import {CreateProcessDto} from './dto/create-process.dto';
 import {UpdateProcessDto} from './dto/update-process.dto';
 import {ProcessFiltersDto} from './dto/process-filters.dto';
@@ -37,6 +38,16 @@ export class ProcessService
     async getClientOptions(userId: string, firmId?: string): Promise<ClientPickerOptionEntity[]>
     {
         return this.clientService.listPickerOptions(userId, firmId);
+    }
+
+    async getMemberOptions(userId: string, firmId?: string, isPartner?: boolean): Promise<FirmMemberEntity[]>
+    {
+        const members = await this.firmService.getMembers(userId, firmId, isPartner);
+
+        return members.map(member => ({
+            ...member,
+            user: member.user ? {...member.user, phone: null, hourlyRate: null, avatarKey: null} : null,
+        }));
     }
 
     async create(userId: string, firmId?: string, dto: CreateProcessDto = {} as CreateProcessDto): Promise<LegalProcessEntity>

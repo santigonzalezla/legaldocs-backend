@@ -8,13 +8,21 @@ const prismaClient = new PrismaClient({adapter});
 const DRY_RUN = process.argv.includes('--dry-run');
 const RESYNC_PERMISSIONS = process.argv.includes('--resync-permissions');
 
-const ABOGADO_MODULES = ['documents', 'processes', 'templates', 'library'];
+const ABOGADO_MODULES = ['documents', 'templates', 'library'];
 const ABOGADO_EXTRA_PERMISSION_KEYS = [
     'time_entries:view',
     'time_entries:start',
     'time_entries:stop',
     'time_entries:log-manual',
     'time_entries:delete',
+    'processes:view',
+    'processes:create',
+    'processes:delete',
+    'processes:restore',
+    'processes:edit-case-details',
+    'processes:manage-documents',
+    'processes:manage-templates',
+    'processes:manage-value-entries',
 ];
 const EXCLUDED_FROM_GERENTE = ['team', 'firm_settings'];
 

@@ -37,13 +37,18 @@ export const STAGE_ORDER: Record<TimelineStage, number> = {
     RECURSO:      6,
 };
 
-// remindAt del recordatorio: offset 0 = "ahora"; con anticipo requiere fecha de evento.
+// remindAt del recordatorio: offset 0 = "ahora"; con anticipo requiere fecha de evento futura.
 const computeRemindAt = (commentDate: Date | null, offsetMinutes: number): Date =>
 {
     if (offsetMinutes === 0) return new Date();
     if (!commentDate)
         throw new BadRequestException('Para un anticipo el comentario debe tener fecha de evento futura. Si no, elegí "Ahora".');
-    return new Date(commentDate.getTime() - offsetMinutes * 60_000);
+
+    const remindAt = new Date(commentDate.getTime() - offsetMinutes * 60_000);
+    if (remindAt.getTime() <= Date.now())
+        throw new BadRequestException('La fecha del evento ya pasó o está muy próxima para ese anticipo. Elegí "Ahora" o un anticipo menor.');
+
+    return remindAt;
 };
 
 @Injectable()

@@ -1,4 +1,5 @@
-import {FirmMember, FirmMemberRole, FirmMemberStatus} from '../../../../generated/prisma/client';
+import {FirmMember, FirmMemberRole, FirmMemberStatus, FirmRole} from '../../../../generated/prisma/client';
+import {UserEntity} from '../../user/entities/user.entity';
 
 export class FirmMemberEntity implements FirmMember
 {
@@ -16,4 +17,6 @@ export class FirmMemberEntity implements FirmMember
     lastActiveAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
+    firmRole?: Partial<FirmRole> | null;
+    user?: Partial<UserEntity> | null;
 }

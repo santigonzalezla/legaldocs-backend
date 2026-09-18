@@ -1,7 +1,7 @@
 import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UploadedFile, UseInterceptors} from '@nestjs/common';
 import {Throttle} from '@nestjs/throttler';
 import {buildUploadInterceptor} from '../../utils/storage/upload.interceptor';
-import {ApiConsumes, ApiHeader, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
+import {ApiConsumes, ApiHeader, ApiOperation, ApiProperty, ApiQuery, ApiTags} from '@nestjs/swagger';
 import {IsEnum} from 'class-validator';
 import {ProcessService} from './process.service';
 import {CurrentUser} from '../auth/decorators/current-user.decorator';
@@ -10,6 +10,7 @@ import {Permission} from '../permissions/decorators/permission.decorator';
 import {LoggedUser} from '../../interfaces/LoggedUser';
 import {CreateProcessDto} from './dto/create-process.dto';
 import {UpdateProcessDto} from './dto/update-process.dto';
+import {UpdateProcessCaseDetailsDto} from './dto/update-process-case-details.dto';
 import {ProcessFiltersDto} from './dto/process-filters.dto';
 import {AddProcessTemplateDto} from './dto/add-process-template.dto';
 import {CreateProcessValueEntryDto} from './dto/create-process-value-entry.dto';
@@ -53,6 +54,15 @@ export class ProcessController
         return this.processService.getClientOptions(user.userId, firmId);
     }
 
+    @Get('member-options')
+    @Permission('processes:view', 'Ver procesos legales')
+    @ApiOperation({summary: 'Lista de miembros del equipo (redactada) para asignar responsables o recordatorios'})
+    @ApiQuery({name: 'isPartner', required: false, description: 'Filtrar solo socios (true) o no socios (false)'})
+    async getMemberOptions(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Query('isPartner') isPartner?: string)
+    {
+        return this.processService.getMemberOptions(user.userId, firmId, isPartner === undefined ? undefined : isPartner === 'true');
+    }
+
     @Get(':id')
     @Permission('processes:view', 'Ver procesos legales')
     @ApiOperation({summary: 'Obtener un proceso por ID'})
@@ -65,6 +75,14 @@ export class ProcessController
     @Permission('processes:edit', 'Editar procesos legales')
     @ApiOperation({summary: 'Actualizar un proceso legal'})
     async update(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Body() dto: UpdateProcessDto = {})
+    {
+        return this.processService.update(user.userId, firmId, id, dto);
+    }
+
+    @Patch(':id/case-details')
+    @Permission('processes:edit-case-details', 'Editar datos del caso (radicado, juzgado, contraparte, rama, fechas)')
+    @ApiOperation({summary: 'Actualizar solo los datos operativos del caso, sin tocar título, cliente ni asignaciones'})
+    async updateCaseDetails(@CurrentUser() user: LoggedUser, @FirmId() firmId?: string, @Param('id') id: string = '', @Body() dto: UpdateProcessCaseDetailsDto = {})
     {
         return this.processService.update(user.userId, firmId, id, dto);
     }
@@ -137,7 +155,7 @@ export class ProcessController
     }
 
     @Post(':id/documents')
-    @Permission('processes:edit', 'Editar procesos legales')
+    @Permission('processes:manage-documents', 'Adjuntar o eliminar documentos de procesos')
     @Throttle({default: {limit: 30, ttl: 60_000}})
     @ApiConsumes('multipart/form-data')
     @UseInterceptors(buildUploadInterceptor(10 * 1024 * 1024))
@@ -154,7 +172,7 @@ export class ProcessController
     }
 
     @Delete(':id/documents/:documentId')
-    @Permission('processes:edit', 'Editar procesos legales')
+    @Permission('processes:manage-documents', 'Adjuntar o eliminar documentos de procesos')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Eliminar un documento adjunto de un proceso'})
     async removeDocument(

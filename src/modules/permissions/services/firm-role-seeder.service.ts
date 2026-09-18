@@ -2,16 +2,27 @@ import {Injectable} from '@nestjs/common';
 import {PrismaService} from '../../prisma/prisma.service';
 import {FirmRole} from '../../../../generated/prisma/client';
 
-const ABOGADO_MODULES = ['documents', 'processes', 'templates', 'library'];
+const ABOGADO_MODULES = ['documents', 'templates', 'library'];
 // Subconjunto de time_entries (no el módulo completo): puede ver/registrar
 // sus propias horas, pero no time_entries:analytics (eso sigue siendo
 // exclusivo de Gerente/Admin — ver TimeEntryService.canViewAllEntries).
+// Subconjunto de processes: puede todo salvo processes:edit (título, cliente,
+// socios, asignaciones) — para eso solo tiene processes:edit-case-details
+// (radicado, juzgado, contraparte, rama, fechas).
 const ABOGADO_EXTRA_PERMISSION_KEYS = [
     'time_entries:view',
     'time_entries:start',
     'time_entries:stop',
     'time_entries:log-manual',
     'time_entries:delete',
+    'processes:view',
+    'processes:create',
+    'processes:delete',
+    'processes:restore',
+    'processes:edit-case-details',
+    'processes:manage-documents',
+    'processes:manage-templates',
+    'processes:manage-value-entries',
 ];
 const EXCLUDED_FROM_GERENTE = ['team', 'firm_settings'];
 
