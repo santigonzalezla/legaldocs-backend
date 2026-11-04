@@ -29,43 +29,43 @@ export class UpdateClientDto
 
     @IsString()
     @IsOptional()
-    @ApiProperty({description: 'Tipo de documento (CC, NIT, CE, PP)', example: 'CC', required: false})
-    documentType?: string;
+    @ApiProperty({description: 'Tipo de documento (CC, NIT, CE, PP)', example: 'CC', required: false, nullable: true})
+    documentType?: string | null;
 
     @IsString()
     @IsOptional()
     @ApiProperty({description: 'Número de documento', example: '1234567890', required: false})
-    documentNumber?: string;
+    documentNumber?: string | null;
 
     @IsEmail()
     @IsOptional()
     @ApiProperty({description: 'Correo electrónico', example: 'cliente@email.com', required: false})
-    email?: string;
+    email?: string | null;
 
     @IsString()
     @IsOptional()
     @ApiProperty({description: 'Teléfono de contacto', example: '+57 300 123 4567', required: false})
-    phone?: string;
+    phone?: string | null;
 
     @IsString()
     @IsOptional()
     @ApiProperty({description: 'Dirección', example: 'Cra 10 # 20-30', required: false})
-    address?: string;
+    address?: string | null;
 
     @IsString()
     @IsOptional()
     @ApiProperty({description: 'Ciudad', example: 'Bogotá', required: false})
-    city?: string;
+    city?: string | null;
 
     @IsEnum(ClientRegimeType)
     @IsOptional()
     @ApiProperty({description: 'Tipo de régimen tributario', enum: ClientRegimeType, required: false})
-    regimeType?: ClientRegimeType;
+    regimeType?: ClientRegimeType | null;
 
     @IsString()
     @IsOptional()
     @ApiProperty({description: 'Sector económico', example: 'Construcción', required: false})
-    sector?: string;
+    sector?: string | null;
 
     @IsBoolean()
     @IsOptional()
@@ -75,5 +75,5 @@ export class UpdateClientDto
     @IsUUID()
     @IsOptional()
     @ApiProperty({description: 'ID del miembro (socio) responsable del cliente', required: false})
-    responsiblePartnerId?: string;
+    responsiblePartnerId?: string | null;
 }
